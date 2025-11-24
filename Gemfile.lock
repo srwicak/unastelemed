@@ -303,8 +303,11 @@ GEM
       ffi (~> 1.12)
       logger
     securerandom (0.4.1)
-    solid_cable (1.0.3)
-      rails (< 9)
+    solid_cable (3.0.12)
+      actioncable (>= 7.2)
+      activejob (>= 7.2)
+      activerecord (>= 7.2)
+      railties (>= 7.2)
     solid_cache (0.7.0)
       activejob (>= 7)
       activerecord (>= 7)
