@@ -1,0 +1,318 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1 class="dashboard-title">Dashboard Hospital Manager</h1>
+    <p class="dashboard-subtitle">Selamat datang, <%= current_user.name %></p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">👨‍⚕️</div>
+      <div class="stat-content">
+        <h3><%= @total_doctors %></h3>
+        <p>Total Dokter</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">👩‍⚕️</div>
+      <div class="stat-content">
+        <h3><%= @total_nurses %></h3>
+        <p>Total Perawat</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏥</div>
+      <div class="stat-content">
+        <h3><%= @total_patients %></h3>
+        <p>Total Pasien</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <h3><%= @total_sessions %></h3>
+        <p>Total Sesi</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Registration Alert -->
+  <% pending_count = MedicalStaff.pending.count %>
+  <% if pending_count > 0 %>
+    <div class="alert alert-warning">
+      <div class="alert-content">
+        <i class="fas fa-exclamation-circle"></i>
+        <span><strong><%= pending_count %></strong> pendaftaran tenaga medis menunggu persetujuan Anda</span>
+      </div>
+      <%= link_to "Review Sekarang", medical_staff_registrations_path, class: "btn btn-warning" %>
+    </div>
+  <% end %>
+
+  <div class="dashboard-grid">
+    <!-- Quick Actions -->
+    <div class="dashboard-section">
+      <h2 class="section-title">Aksi Cepat</h2>
+      <div class="action-cards">
+        <%= link_to add_staff_hospital_path(current_user.hospital), class: "action-card" do %>
+          <i class="fas fa-user-plus text-4xl text-green-600 mb-3"></i>
+          <h3>Tambah Dokter/Perawat</h3>
+          <p>Daftarkan tenaga medis baru</p>
+        <% end %>
+        
+        <%= link_to medical_staff_registrations_path, class: "action-card" do %>
+          <i class="fas fa-user-check text-4xl text-purple-600 mb-3"></i>
+          <h3>Review Pendaftaran</h3>
+          <p>Approve/reject pendaftaran tenaga medis</p>
+          <% if pending_count > 0 %>
+            <span class="badge badge-warning"><%= pending_count %> pending</span>
+          <% end %>
+        <% end %>
+
+        <%= link_to medical_staff_path, class: "action-card" do %>
+          <i class="fas fa-users text-4xl text-blue-600 mb-3"></i>
+          <h3>Kelola Tenaga Medis</h3>
+          <p>Lihat dan kelola daftar dokter & perawat</p>
+        <% end %>
+
+        <%= link_to patients_path, class: "action-card" do %>
+          <i class="fas fa-hospital-user text-4xl text-green-600 mb-3"></i>
+          <h3>Kelola Pasien</h3>
+          <p>Lihat daftar pasien dan riwayat medis</p>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Recent Staff -->
+    <div class="dashboard-section">
+      <h2 class="section-title">Tenaga Medis Terbaru</h2>
+      <% if @recent_staff.any? %>
+        <div class="staff-list">
+          <% @recent_staff.each do |staff| %>
+            <div class="staff-item">
+              <div class="staff-info">
+                <h4><%= staff.name %></h4>
+                <p class="text-gray-600">
+                  <%= staff.email %> • 
+                  <% if staff.role == 'doctor' %>
+                    <span class="badge badge-primary">Dokter</span>
+                  <% else %>
+                    <span class="badge badge-info">Perawat</span>
+                  <% end %>
+                </p>
+              </div>
+              <div class="staff-date">
+                <%= staff.created_at.strftime('%d %b %Y') %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="no-data">Belum ada tenaga medis terdaftar.</p>
+      <% end %>
+    </div>
+
+    <!-- Recent Sessions -->
+    <div class="dashboard-section">
+      <h2 class="section-title">Sesi Pemeriksaan Terbaru</h2>
+      <% if @recent_sessions.any? %>
+        <div class="sessions-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Pasien</th>
+                <th>Petugas Medis</th>
+                <th>Status</th>
+                <th>Tanggal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @recent_sessions.each do |session| %>
+                <tr>
+                  <td><%= session.patient.name %></td>
+                  <td><%= session.medical_staff.name %></td>
+                  <td>
+                    <% if session.status == 'active' %>
+                      <span class="status-badge active">Aktif</span>
+                    <% elsif session.status == 'completed' %>
+                      <span class="status-badge completed">Selesai</span>
+                    <% else %>
+                      <span class="status-badge cancelled">Batal</span>
+                    <% end %>
+                  </td>
+                  <td><%= session.created_at.strftime('%d %b %Y %H:%M') %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="no-data">Belum ada sesi pemeriksaan.</p>
+      <% end %>
+    </div>
+
+    <!-- Hospitals -->
+    <div class="dashboard-section">
+      <h2 class="section-title">Daftar Rumah Sakit</h2>
+      <% if @hospitals.any? %>
+        <div class="hospitals-grid">
+          <% @hospitals.each do |hospital| %>
+            <div class="hospital-card">
+              <h4><%= hospital.name %></h4>
+              <p class="text-gray-600"><%= hospital.address %></p>
+              <div class="hospital-stats">
+                <span><i class="fas fa-user-md"></i> <%= hospital.users.count %> Staff</span>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="no-data">Belum ada rumah sakit terdaftar.</p>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<style>
+.alert {
+  background: #fff3cd;
+  border: 1px solid #ffecb5;
+  border-radius: 8px;
+  padding: 15px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alert-warning {
+  background: #fff3cd;
+  border-color: #ffecb5;
+}
+
+.alert-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #856404;
+}
+
+.alert-content i {
+  font-size: 24px;
+}
+
+.action-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.action-card {
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+}
+
+.action-card:hover {
+  border-color: #3498db;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+  transform: translateY(-2px);
+}
+
+.action-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2c3e50;
+}
+
+.action-card p {
+  font-size: 13px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.staff-list {
+  margin-top: 15px;
+}
+
+.staff-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.staff-item:last-child {
+  border-bottom: none;
+}
+
+.staff-info h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #2c3e50;
+}
+
+.staff-info p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.staff-date {
+  font-size: 13px;
+  color: #7f8c8d;
+}
+
+.hospitals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.hospital-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.hospital-card h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #2c3e50;
+}
+
+.hospital-card p {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+}
+
+.hospital-stats {
+  padding-top: 12px;
+  border-top: 1px solid #ecf0f1;
+  font-size: 13px;
+  color: #7f8c8d;
+}
+
+.badge-warning {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #f39c12;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+</style>

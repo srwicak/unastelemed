@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  medical_staff: one
+  hospital: one
+  status: MyString
+  active: false
+  started_at: 2025-11-19 20:07:56
+  ended_at: 2025-11-19 20:07:56
+
+two:
+  medical_staff: two
+  hospital: two
+  status: MyString
+  active: false
+  started_at: 2025-11-19 20:07:56
+  ended_at: 2025-11-19 20:07:56

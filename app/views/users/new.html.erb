@@ -1,0 +1,181 @@
+<% content_for :skip_navbar do %>true<% end %>
+
+<div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+  <div class="max-w-4xl w-full space-y-8 bg-white p-10 rounded-2xl shadow-xl border border-slate-100">
+    <div class="text-center">
+      <div class="mx-auto h-16 w-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg transform rotate-3 hover:rotate-0 transition-all duration-300">
+        M
+      </div>
+      <h2 class="mt-6 text-3xl font-extrabold text-slate-900 tracking-tight">
+        Registrasi Pasien Baru
+      </h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Daftar untuk mengakses hasil pemeriksaan dan riwayat kesehatan Anda
+      </p>
+    </div>
+
+    <% if flash[:alert] %>
+      <div class="rounded-lg bg-red-50 p-4 border border-red-200 animate-slide-up">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">Registrasi Gagal</h3>
+            <div class="mt-2 text-sm text-red-700">
+              <p><%= flash[:alert] %></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @user.errors.any? %>
+      <div class="rounded-lg bg-red-50 p-4 border border-red-200 animate-slide-up">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">Terjadi kesalahan:</h3>
+            <ul class="mt-2 text-sm text-red-700 list-disc list-inside">
+              <% @user.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%= form_with model: @user, url: register_path, method: :post, local: true, class: "mt-8 space-y-6" do |f| %>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Account Info -->
+        <div class="space-y-6">
+          <h3 class="text-lg font-medium text-slate-900 border-b pb-2">Informasi Akun</h3>
+          
+          <div>
+            <%= f.label :name, "Nama Lengkap", class: "block text-sm font-medium text-slate-700" %>
+            <div class="mt-1">
+              <%= f.text_field :name, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "Nama Lengkap" %>
+            </div>
+          </div>
+
+          <div>
+            <%= f.label :email, "Email", class: "block text-sm font-medium text-slate-700" %>
+            <div class="mt-1">
+              <%= f.email_field :email, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "nama@email.com" %>
+            </div>
+          </div>
+
+          <div>
+            <%= f.label :password, "Password", class: "block text-sm font-medium text-slate-700" %>
+            <div class="mt-1">
+              <%= f.password_field :password, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "Minimal 6 karakter" %>
+            </div>
+          </div>
+
+          <div>
+            <%= f.label :password_confirmation, "Konfirmasi Password", class: "block text-sm font-medium text-slate-700" %>
+            <div class="mt-1">
+              <%= f.password_field :password_confirmation, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "Ulangi password" %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Patient Info -->
+        <div class="space-y-6">
+          <h3 class="text-lg font-medium text-slate-900 border-b pb-2">Data Pasien</h3>
+          
+          <%= f.fields_for :patient do |patient_fields| %>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <%= patient_fields.label :date_of_birth, "Tanggal Lahir", class: "block text-sm font-medium text-slate-700" %>
+                <div class="mt-1">
+                  <%= patient_fields.date_field :date_of_birth, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true %>
+                </div>
+              </div>
+
+              <div>
+                <%= patient_fields.label :gender, "Jenis Kelamin", class: "block text-sm font-medium text-slate-700" %>
+                <div class="mt-1">
+                  <%= patient_fields.select :gender, options_for_select([['Laki-laki', 'male'], ['Perempuan', 'female']]), { prompt: "Pilih" }, { class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true } %>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <%= patient_fields.label :phone_number, "Nomor Telepon", class: "block text-sm font-medium text-slate-700" %>
+              <div class="mt-1">
+                <%= patient_fields.telephone_field :phone_number, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "08xxxxxxxxxx" %>
+              </div>
+            </div>
+
+            <div>
+              <%= patient_fields.label :address, "Alamat", class: "block text-sm font-medium text-slate-700" %>
+              <div class="mt-1">
+                <%= patient_fields.text_area :address, rows: 2, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "Alamat lengkap" %>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <%= patient_fields.label :blood_type, "Gol. Darah", class: "block text-sm font-medium text-slate-700" %>
+                <div class="mt-1">
+                  <%= patient_fields.select :blood_type, options_for_select(['A', 'B', 'AB', 'O']), { prompt: "Pilih" }, { class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm" } %>
+                </div>
+              </div>
+              
+              <div>
+                <%= patient_fields.label :emergency_contact, "Kontak Darurat", class: "block text-sm font-medium text-slate-700" %>
+                <div class="mt-1">
+                  <%= patient_fields.text_field :emergency_contact, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", required: true, placeholder: "Nama & No. HP" %>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <button type="button" onclick="document.getElementById('medical-history').classList.toggle('hidden')" class="text-sm text-primary-600 hover:text-primary-500 font-medium flex items-center">
+                <span>+ Tambah Riwayat Medis (Opsional)</span>
+              </button>
+            </div>
+            
+            <div id="medical-history" class="hidden space-y-4 pt-2">
+              <div>
+                <%= patient_fields.label :allergies, "Alergi", class: "block text-sm font-medium text-slate-700" %>
+                <div class="mt-1">
+                  <%= patient_fields.text_area :allergies, rows: 2, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", placeholder: "Sebutkan jika ada" %>
+                </div>
+              </div>
+
+              <div>
+                <%= patient_fields.label :medical_conditions, "Kondisi Medis", class: "block text-sm font-medium text-slate-700" %>
+                <div class="mt-1">
+                  <%= patient_fields.text_area :medical_conditions, rows: 2, class: "appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm", placeholder: "Sebutkan jika ada" %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="pt-6 border-t border-slate-200">
+        <%= f.submit "Daftar Sekarang", class: "group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5" %>
+      </div>
+    <% end %>
+    
+    <div class="mt-6 text-center">
+      <p class="text-sm text-slate-600">
+        Sudah memiliki akun? 
+        <%= link_to "Login di sini", login_path, class: "font-medium text-primary-600 hover:text-primary-500 transition-colors" %>
+      </p>
+      <p class="mt-2">
+        <%= link_to "Kembali ke Beranda", root_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+      </p>
+    </div>
+  </div>
+</div>

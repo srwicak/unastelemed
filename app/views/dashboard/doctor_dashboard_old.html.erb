@@ -1,0 +1,182 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1 class="dashboard-title">Dashboard Dokter</h1>
+    <p class="dashboard-subtitle">Selamat datang, Dr. <%= @medical_staff.name %></p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-content">
+        <h3><%= @patients_count %></h3>
+        <p>Total Pasien</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <h3><%= @sessions_count %></h3>
+        <p>Total Sesi</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <h3><%= @completed_interpretations %></h3>
+        <p>Interpretasi Selesai</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="dashboard-section">
+      <h2 class="section-title">Sesi Menunggu Interpretasi</h2>
+      <% if @pending_sessions.any? %>
+        <div class="sessions-list">
+          <% @pending_sessions.each do |session| %>
+            <div class="session-card pending">
+              <div class="session-header">
+                <h3><%= session.patient.name %></h3>
+                <span class="session-date"><%= session.created_at.strftime('%d %b %Y %H:%M') %></span>
+              </div>
+              <div class="session-info">
+                <p><strong>Kode QR:</strong> <%= session.qr_code&.code %></p>
+                <p><strong>Status:</strong> <span class="status-badge pending">Menunggu Interpretasi</span></p>
+              </div>
+              <div class="session-actions">
+                <%= link_to "Lihat Data", view_recording_path(session.recordings.first), class: "btn btn-primary" %>
+                <%= link_to "Tambah Interpretasi", "#", class: "btn btn-success", 
+                    onclick: "showInterpretationModal(#{session.id})" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="no-data">Tidak ada sesi yang menunggu interpretasi.</p>
+      <% end %>
+    </div>
+
+    <div class="dashboard-section">
+      <h2 class="section-title">Interpretasi Terbaru</h2>
+      <% if @recent_interpretations.any? %>
+        <div class="interpretations-list">
+          <% @recent_interpretations.each do |session| %>
+            <div class="interpretation-card">
+              <div class="interpretation-header">
+                <h3><%= session.patient.name %></h3>
+                <span class="interpretation-date"><%= session.updated_at.strftime('%d %b %Y') %></span>
+              </div>
+              <div class="interpretation-content">
+                <p><strong>Diagnosis:</strong> <%= session.diagnosis %></p>
+                <p><strong>Catatan:</strong> <%= truncate(session.doctor_notes, length: 100) %></p>
+                <% if session.recommendations %>
+                  <p><strong>Rekomendasi:</strong> <%= truncate(session.recommendations, length: 100) %></p>
+                <% end %>
+              </div>
+              <div class="interpretation-footer">
+                <span class="doctor-name">Dr. <%= session.medical_staff.name %></span>
+                <%= link_to "Lihat Detail", view_recording_path(session.recordings.first), class: "btn btn-outline" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="no-data">Belum ada interpretasi yang dibuat.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="dashboard-section">
+    <h2 class="section-title">Sesi Pemeriksaan Terbaru</h2>
+    <% if @recent_sessions.any? %>
+      <div class="sessions-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Pasien</th>
+              <th>Tanggal</th>
+              <th>Status</th>
+              <th>Interpretasi</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @recent_sessions.each do |session| %>
+              <tr>
+                <td><%= session.patient.name %></td>
+                <td><%= session.created_at.strftime('%d %b %Y %H:%M') %></td>
+                <td>
+                  <span class="status-badge <%= session.status %>"><%= session.status %></span>
+                </td>
+                <td>
+                  <% if session.interpretation_completed? %>
+                    <span class="status-badge completed">Selesai</span>
+                  <% else %>
+                    <span class="status-badge pending">Menunggu</span>
+                  <% end %>
+                </td>
+                <td>
+                  <%= link_to "Detail", view_recording_path(session.recordings.first), class: "btn btn-sm btn-primary" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="no-data">Belum ada sesi pemeriksaan.</p>
+    <% end %>
+  </div>
+</div>
+
+<!-- Modal untuk Tambah Interpretasi -->
+<div id="interpretationModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Tambah Interpretasi</h2>
+      <span class="close" onclick="closeInterpretationModal()">&times;</span>
+    </div>
+    <%= form_with url: add_interpretation_path, method: :post, local: true do |f| %>
+      <%= hidden_field_tag :id, '', id: 'session_id' %>
+      
+      <div class="form-group">
+        <%= f.label :diagnosis, "Diagnosis" %>
+        <%= f.text_area :diagnosis, class: "form-control", rows: 2, required: true %>
+      </div>
+      
+      <div class="form-group">
+        <%= f.label :doctor_notes, "Catatan Dokter" %>
+        <%= f.text_area :doctor_notes, class: "form-control", rows: 4, required: true %>
+      </div>
+      
+      <div class="form-group">
+        <%= f.label :recommendations, "Rekomendasi" %>
+        <%= f.text_area :recommendations, class: "form-control", rows: 3 %>
+      </div>
+      
+      <div class="modal-actions">
+        <%= f.submit "Simpan Interpretasi", class: "btn btn-success" %>
+        <button type="button" class="btn btn-secondary" onclick="closeInterpretationModal()">Batal</button>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<script>
+function showInterpretationModal(sessionId) {
+  document.getElementById('session_id').value = sessionId;
+  document.getElementById('interpretationModal').style.display = 'block';
+}
+
+function closeInterpretationModal() {
+  document.getElementById('interpretationModal').style.display = 'none';
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+  const modal = document.getElementById('interpretationModal');
+  if (event.target == modal) {
+    modal.style.display = 'none';
+  }
+}
+</script>

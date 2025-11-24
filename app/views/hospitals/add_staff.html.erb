@@ -1,0 +1,371 @@
+<div class="staff-form-container">
+  <div class="form-header">
+    <h1>➕ Tambah Tenaga Medis</h1>
+    <p class="subtitle">Tambahkan Dokter atau Perawat ke <%= @hospital.name %></p>
+  </div>
+
+  <%= form_with url: create_staff_hospital_path, method: :post, local: true, html: { class: 'staff-form' } do |f| %>
+    <% if @staff_user&.errors&.any? || @medical_staff&.errors&.any? %>
+      <div class="error-messages">
+        <h3>Terdapat kesalahan:</h3>
+        <ul>
+          <% if @staff_user %>
+            <% @staff_user.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          <% end %>
+          <% if @medical_staff %>
+            <% @medical_staff.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <!-- Informasi Akun -->
+    <div class="form-section">
+      <h2>🔐 Informasi Akun Login</h2>
+
+      <%= fields_for :staff_user, @staff_user do |user| %>
+        <div class="form-group">
+          <%= user.label :role, "Posisi" %>
+          <%= user.select :role, 
+              options_for_select([
+                ['👨‍⚕️ Dokter', 'doctor'], 
+                ['👩‍⚕️ Perawat', 'nurse']
+              ]), 
+              { prompt: "-- Pilih Posisi --" }, 
+              { class: "form-control role-select", required: true, 
+                onchange: "updateFormLabels(this.value)" } %>
+        </div>
+
+        <div class="form-group">
+          <%= user.label :email, "Email" %>
+          <%= user.email_field :email, class: "form-control", required: true, 
+              placeholder: "dokter@rumahsakit.com" %>
+          <small class="form-text">Akan digunakan untuk login ke sistem</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <%= user.label :password, "Password" %>
+            <%= user.password_field :password, class: "form-control", required: true, 
+                minlength: 6, placeholder: "Minimal 6 karakter" %>
+          </div>
+
+          <div class="form-group">
+            <%= user.label :password_confirmation, "Konfirmasi Password" %>
+            <%= user.password_field :password_confirmation, class: "form-control", required: true %>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <%= user.label :phone, "No. Telepon" %>
+          <%= user.text_field :phone, class: "form-control", required: true, 
+              placeholder: "+628123456789" %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Informasi Profesional -->
+    <div class="form-section">
+      <h2>📋 Informasi Profesional</h2>
+
+      <%= fields_for :medical_staff, @medical_staff do |staff| %>
+        <div class="form-group">
+          <%= staff.label :name, "Nama Lengkap" %>
+          <%= staff.text_field :name, class: "form-control", required: true, 
+              placeholder: "Dr. John Doe" %>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <%= staff.label :license_number, "Nomor Izin Praktik" %>
+            <%= staff.text_field :license_number, class: "form-control", required: true, 
+                placeholder: "SIP.123456789", id: "license_number_field" %>
+            <small class="form-text" id="license_help">
+              Nomor SIP (Dokter) atau STR (Perawat)
+            </small>
+          </div>
+
+          <div class="form-group">
+            <%= staff.label :specialization, "Spesialisasi" %>
+            <%= staff.text_field :specialization, class: "form-control", required: true, 
+                placeholder: "Kardiologi", id: "specialization_field" %>
+            <small class="form-text" id="specialization_help">
+              Bidang keahlian
+            </small>
+          </div>
+        </div>
+
+        <%= staff.hidden_field :role, id: "medical_staff_role" %>
+      <% end %>
+    </div>
+
+    <!-- Info Box -->
+    <div class="info-box">
+      <div class="info-icon">ℹ️</div>
+      <div class="info-content">
+        <strong>Informasi:</strong>
+        <ul>
+          <li>Akun akan langsung aktif setelah dibuat (tidak perlu approval)</li>
+          <li>Staff dapat login menggunakan email dan password yang dibuat</li>
+          <li>Kirimkan kredensial login ke staff melalui email/WhatsApp</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <%= f.submit "💾 Simpan & Tambahkan Staff", class: "btn btn-primary btn-lg", 
+          data: { confirm: "Yakin ingin menambahkan staff ini?" } %>
+      <%= link_to "❌ Batal", hospital_manager_dashboard_path, class: "btn btn-secondary" %>
+    </div>
+  <% end %>
+</div>
+
+<script>
+function updateFormLabels(role) {
+  const licenseField = document.getElementById('license_number_field');
+  const licenseHelp = document.getElementById('license_help');
+  const specializationField = document.getElementById('specialization_field');
+  const specializationHelp = document.getElementById('specialization_help');
+  const medicalStaffRole = document.getElementById('medical_staff_role');
+  
+  if (role === 'doctor') {
+    licenseField.placeholder = 'SIP.123456789';
+    licenseHelp.textContent = 'Nomor Surat Izin Praktik (SIP)';
+    specializationField.placeholder = 'Kardiologi, Penyakit Dalam, dll';
+    specializationHelp.textContent = 'Spesialisasi medis';
+  } else if (role === 'nurse') {
+    licenseField.placeholder = 'STR.987654321';
+    licenseHelp.textContent = 'Nomor Surat Tanda Registrasi (STR)';
+    specializationField.placeholder = 'Umum, ICU, Bedah, dll';
+    specializationHelp.textContent = 'Bidang keperawatan';
+  }
+  
+  // Set medical_staff role
+  if (medicalStaffRole) {
+    medicalStaffRole.value = role;
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const roleSelect = document.querySelector('.role-select');
+  if (roleSelect && roleSelect.value) {
+    updateFormLabels(roleSelect.value);
+  }
+});
+</script>
+
+<style>
+.staff-form-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 35px;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #27ae60;
+}
+
+.form-header h1 {
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-size: 28px;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  font-size: 15px;
+}
+
+.form-section {
+  margin-bottom: 30px;
+  padding: 25px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #27ae60;
+}
+
+.form-section h2 {
+  font-size: 18px;
+  color: #2c3e50;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #27ae60;
+  box-shadow: 0 0 0 4px rgba(39, 174, 96, 0.1);
+}
+
+.role-select {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.form-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.info-box {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  background: #e8f8f5;
+  border: 2px solid #27ae60;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.info-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.info-content {
+  flex: 1;
+}
+
+.info-content strong {
+  color: #27ae60;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.info-content ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #2c3e50;
+}
+
+.info-content li {
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 15px;
+  padding-top: 20px;
+  border-top: 2px solid #ecf0f1;
+}
+
+.btn {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+  color: white;
+  flex: 1;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.btn-secondary {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #7f8c8d;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 18px;
+}
+
+.error-messages {
+  background: #fee;
+  border: 2px solid #e74c3c;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.error-messages h3 {
+  color: #c0392b;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.error-messages ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.error-messages li {
+  color: #c0392b;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .staff-form-container {
+    margin: 20px;
+    padding: 20px;
+  }
+}
+</style>

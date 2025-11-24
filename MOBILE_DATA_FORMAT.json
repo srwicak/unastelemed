@@ -1,0 +1,73 @@
+{
+  "start_recording": {
+    "endpoint": "POST /api/recordings/start",
+    "request": {
+      "qr_code": "{\"session_id\":\"702664379c264e04\",\"patient_identifier\":\"f2wkYtlhVFGF\",\"timestamp\":\"2025-11-22T02:13:51Z\",\"expiry\":\"2025-11-23T02:13:51Z\",\"device_type\":\"CardioGuardian\",\"validation_code\":\"60d338770c1c4cb677404b8063dd9234\",\"max_duration_seconds\":3600,\"code\":\"QR_CODE_STRING\"}",
+      "session_id": "702664379c264e04",
+      "device_id": "CG-12345",
+      "device_name": "CardioGuardian #1",
+      "sample_rate": 500.0
+    },
+    "response": {
+      "success": true,
+      "message": "Recording dimulai",
+      "data": {
+        "recording_id": 1,
+        "session_id": "702664379c264e04",
+        "patient": {
+          "id": 5,
+          "name": "John Doe",
+          "patient_identifier": "f2wkYtlhVFGF"
+        },
+        "max_duration_seconds": 3600,
+        "sample_rate": 500.0,
+        "started_at": "2025-11-22T10:30:00.000Z"
+      }
+    }
+  },
+
+  "send_batch_data": {
+    "endpoint": "POST /api/recordings/data",
+    "frequency": "Every 10 seconds",
+    "samples_per_batch": 5000,
+    "request": {
+      "recording_id": 1,
+      "batch_data": {
+        "batch_sequence": 0,
+        "start_timestamp": "2025-11-22T10:30:00.000Z",
+        "end_timestamp": "2025-11-22T10:30:10.000Z",
+        "sample_rate": 500.0,
+        "samples": [512, 515, 518, 520, 523, 525, 528, 530, 533, 535, 538, 540, 543, 545, 548, 550]
+      }
+    },
+    "response": {
+      "success": true,
+      "message": "Batch data berhasil disimpan",
+      "data": {
+        "recording_id": 1,
+        "batch_sequence": 0,
+        "samples_received": 5000,
+        "total_batches": 1,
+        "total_samples": 5000
+      }
+    }
+  },
+
+  "stop_recording": {
+    "endpoint": "POST /api/recordings/1/stop",
+    "request": {},
+    "response": {
+      "success": true,
+      "message": "Recording selesai",
+      "data": {
+        "recording_id": 1,
+        "session_id": "702664379c264e04",
+        "status": "completed",
+        "started_at": "2025-11-22T10:30:00.000Z",
+        "ended_at": "2025-11-22T11:30:00.000Z",
+        "duration_seconds": 3600,
+        "total_samples": 1800000
+      }
+    }
+  }
+}

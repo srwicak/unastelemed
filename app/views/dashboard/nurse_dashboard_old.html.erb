@@ -1,0 +1,188 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1 class="dashboard-title">Dashboard Perawat</h1>
+    <p class="dashboard-subtitle">Selamat datang, <%= @medical_staff.name %></p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📅</div>
+      <div class="stat-content">
+        <h3><%= @today_sessions %></h3>
+        <p>Sesi Hari Ini</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🔄</div>
+      <div class="stat-content">
+        <h3><%= @active_count %></h3>
+        <p>Sesi Aktif</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-content">
+        <h3><%= @patients.count %></h3>
+        <p>Total Pasien</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="dashboard-section">
+      <div class="section-header">
+        <h2 class="section-title">Sesi Aktif</h2>
+        <%= link_to "+ Buat Sesi Baru", "#", class: "btn btn-primary", onclick: "showCreateSessionModal()" %>
+      </div>
+      
+      <% if @active_sessions.any? %>
+        <div class="sessions-list">
+          <% @active_sessions.each do |session| %>
+            <div class="session-card active">
+              <div class="session-header">
+                <h3><%= session.patient.name %></h3>
+                <span class="session-date"><%= session.created_at.strftime('%d %b %Y %H:%M') %></span>
+              </div>
+              <div class="session-info">
+                <p><strong>Kode QR:</strong> <span class="qr-code"><%= session.qr_code&.code %></span></p>
+                <p><strong>Status:</strong> <span class="status-badge active">Aktif</span></p>
+                <% if session.notes.present? %>
+                  <p><strong>Catatan:</strong> <%= session.notes %></p>
+                <% end %>
+              </div>
+              <div class="session-actions">
+                <%= link_to "Lihat Detail", session_path(session), class: "btn btn-outline" %>
+                <%= button_to "Selesaikan", complete_session_path(session), method: :patch, 
+                    class: "btn btn-success", 
+                    data: { confirm: 'Yakin ingin menyelesaikan sesi ini?' } %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="no-data">Tidak ada sesi aktif saat ini.</p>
+        <p class="help-text">Klik "Buat Sesi Baru" untuk memulai pemeriksaan pasien.</p>
+      <% end %>
+    </div>
+
+    <div class="dashboard-section">
+      <h2 class="section-title">Sesi Selesai Hari Ini</h2>
+      <% if @completed_sessions.any? %>
+        <div class="sessions-list">
+          <% @completed_sessions.each do |session| %>
+            <div class="session-card completed">
+              <div class="session-header">
+                <h3><%= session.patient.name %></h3>
+                <span class="session-date"><%= session.created_at.strftime('%H:%M') %></span>
+              </div>
+              <div class="session-info">
+                <p><strong>Kode QR:</strong> <%= session.qr_code&.code %></p>
+                <p><strong>Status:</strong> 
+                  <% if session.interpretation_completed? %>
+                    <span class="status-badge completed">Sudah Diinterpretasi</span>
+                  <% else %>
+                    <span class="status-badge waiting">Menunggu Dokter</span>
+                  <% end %>
+                </p>
+              </div>
+              <div class="session-actions">
+                <%= link_to "Lihat Detail", session_path(session), class: "btn btn-sm btn-outline" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="no-data">Belum ada sesi yang selesai hari ini.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="dashboard-section">
+    <h2 class="section-title">Daftar Pasien</h2>
+    <div class="patients-table">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nama Pasien</th>
+            <th>Email</th>
+            <th>No. Telepon</th>
+            <th>Total Sesi</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @patients.each do |patient| %>
+            <% patient_sessions = patient.recording_sessions.count %>
+            <tr>
+              <td><%= patient.name %></td>
+              <td><%= patient.user.email %></td>
+              <td><%= patient.phone_number %></td>
+              <td><%= patient_sessions %></td>
+              <td>
+                <%= link_to "Buat Sesi", "#", class: "btn btn-sm btn-primary", 
+                    onclick: "selectPatientForSession(#{patient.id}, '#{patient.name}')" %>
+                <%= link_to "Riwayat", patient_path(patient), class: "btn btn-sm btn-outline" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal untuk Buat Sesi Baru -->
+<div id="createSessionModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Buat Sesi Pemeriksaan Baru</h2>
+      <span class="close" onclick="closeCreateSessionModal()">&times;</span>
+    </div>
+    <%= form_with url: create_session_path, method: :post, local: true do |f| %>
+      <div class="form-group">
+        <%= f.label :patient_id, "Pilih Pasien" %>
+        <%= f.select :patient_id, 
+            options_for_select(@patients.map { |p| [p.name, p.id] }), 
+            { prompt: "-- Pilih Pasien --" }, 
+            { class: "form-control", required: true } %>
+      </div>
+      
+      <div class="form-group">
+        <%= f.label :notes, "Catatan Pemeriksaan (Opsional)" %>
+        <%= f.text_area :notes, class: "form-control", rows: 3, 
+            placeholder: "Masukkan catatan atau keluhan pasien..." %>
+      </div>
+      
+      <%= hidden_field_tag "recording_session[medical_staff_id]", @medical_staff.id %>
+      
+      <div class="modal-actions">
+        <%= f.submit "Buat Sesi", class: "btn btn-success" %>
+        <button type="button" class="btn btn-secondary" onclick="closeCreateSessionModal()">Batal</button>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<script>
+function showCreateSessionModal() {
+  document.getElementById('createSessionModal').style.display = 'block';
+}
+
+function closeCreateSessionModal() {
+  document.getElementById('createSessionModal').style.display = 'none';
+}
+
+function selectPatientForSession(patientId, patientName) {
+  showCreateSessionModal();
+  document.getElementById('patient_id').value = patientId;
+  // Optional: You could add visual feedback that patient is selected
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+  const modal = document.getElementById('createSessionModal');
+  if (event.target == modal) {
+    modal.style.display = 'none';
+  }
+}
+</script>

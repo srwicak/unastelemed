@@ -1,0 +1,337 @@
+<div class="registration-container">
+  <div class="registration-header">
+    <h1>Registrasi Rumah Sakit Baru</h1>
+    <p class="subtitle">Daftarkan rumah sakit dan buat akun Hospital Manager</p>
+  </div>
+
+  <%= form_with url: hospitals_path, method: :post, local: true, html: { class: 'registration-form' } do |f| %>
+    <% if @hospital&.errors&.any? || @manager&.errors&.any? %>
+      <div class="error-messages">
+        <h3>Terdapat kesalahan:</h3>
+        <ul>
+          <% if @hospital %>
+            <% @hospital.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          <% end %>
+          <% if @manager %>
+            <% @manager.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <!-- Informasi Rumah Sakit -->
+    <div class="form-section">
+      <h2>📋 Informasi Rumah Sakit</h2>
+      
+      <%= fields_for :hospital, @hospital do |hospital| %>
+        <div class="form-group">
+          <%= hospital.label :name, "Nama Rumah Sakit" %>
+          <%= hospital.text_field :name, class: "form-control", required: true, 
+              placeholder: "RS Jantung Harapan Sehat" %>
+        </div>
+
+        <div class="form-group">
+          <%= hospital.label :code, "Kode Rumah Sakit" %>
+          <%= hospital.text_field :code, class: "form-control", required: true, 
+              placeholder: "RSJ001" %>
+          <small class="form-text">Kode unik untuk identifikasi RS (contoh: RSJ001, RSU123)</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <%= hospital.label :phone, "No. Telepon" %>
+            <%= hospital.text_field :phone, class: "form-control", required: true, 
+                placeholder: "+62211234567" %>
+          </div>
+
+          <div class="form-group">
+            <%= hospital.label :email, "Email Rumah Sakit" %>
+            <%= hospital.email_field :email, class: "form-control", required: true, 
+                placeholder: "info@rumahsakit.com" %>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <%= hospital.label :address, "Alamat Lengkap" %>
+          <%= hospital.text_area :address, class: "form-control", rows: 3, required: true, 
+              placeholder: "Jl. Kesehatan No. 123, Kelurahan ABC, Kecamatan XYZ, Jakarta Pusat 10110" %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Informasi Hospital Manager -->
+    <div class="form-section">
+      <h2>👤 Informasi Hospital Manager</h2>
+      <p class="section-description">
+        Hospital Manager akan memiliki akses untuk mengelola dokter, perawat, dan operasional rumah sakit.
+      </p>
+
+      <%= fields_for :manager, @manager do |manager| %>
+        <div class="form-group">
+          <%= manager.label :name, "Nama Lengkap Manager" %>
+          <%= manager.text_field :name, class: "form-control", required: true, 
+              placeholder: "Budi Santoso" %>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <%= manager.label :email, "Email Manager" %>
+            <%= manager.email_field :email, class: "form-control", required: true, 
+                placeholder: "budi.manager@rumahsakit.com" %>
+            <small class="form-text">Akan digunakan untuk login</small>
+          </div>
+
+          <div class="form-group">
+            <%= manager.label :phone, "No. Telepon Manager" %>
+            <%= manager.text_field :phone, class: "form-control", required: true, 
+                placeholder: "+628123456789" %>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <%= manager.label :password, "Password" %>
+            <%= manager.password_field :password, class: "form-control", required: true, minlength: 6 %>
+            <small class="form-text">Minimal 6 karakter</small>
+          </div>
+
+          <div class="form-group">
+            <%= manager.label :password_confirmation, "Konfirmasi Password" %>
+            <%= manager.password_field :password_confirmation, class: "form-control", required: true %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="form-actions">
+      <%= f.submit "📝 Daftarkan Rumah Sakit", class: "btn btn-primary btn-lg" %>
+      <%= link_to "Batal", hospitals_path, class: "btn btn-secondary" %>
+    </div>
+
+    <div class="form-note">
+      <p><strong>Catatan:</strong></p>
+      <ul>
+        <li>Setelah registrasi, Hospital Manager dapat login menggunakan email dan password yang telah dibuat</li>
+        <li>Hospital Manager dapat menambahkan dokter dan perawat melalui dashboard</li>
+        <li>Pastikan data yang diinput sudah benar sebelum submit</li>
+      </ul>
+    </div>
+  <% end %>
+</div>
+
+<style>
+.registration-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.registration-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #3498db;
+}
+
+.registration-header h1 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 28px;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  font-size: 16px;
+}
+
+.form-section {
+  margin-bottom: 35px;
+  padding: 25px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #3498db;
+}
+
+.form-section h2 {
+  font-size: 20px;
+  color: #2c3e50;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-description {
+  color: #7f8c8d;
+  font-size: 14px;
+  margin-bottom: 20px;
+  padding: 10px;
+  background: white;
+  border-radius: 4px;
+  border-left: 3px solid #f39c12;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+}
+
+.form-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.form-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 2px solid #ecf0f1;
+}
+
+.btn {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  flex: 1;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.btn-secondary {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #7f8c8d;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 18px;
+}
+
+.error-messages {
+  background: #fee;
+  border: 2px solid #e74c3c;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.error-messages h3 {
+  color: #c0392b;
+  font-size: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-messages h3::before {
+  content: "⚠️";
+}
+
+.error-messages ul {
+  margin: 0;
+  padding-left: 25px;
+}
+
+.error-messages li {
+  color: #c0392b;
+  margin-bottom: 6px;
+}
+
+.form-note {
+  margin-top: 25px;
+  padding: 20px;
+  background: #e8f4f8;
+  border-left: 4px solid #3498db;
+  border-radius: 6px;
+}
+
+.form-note p {
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.form-note ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #555;
+}
+
+.form-note li {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .registration-container {
+    margin: 20px;
+    padding: 20px;
+  }
+}
+</style>

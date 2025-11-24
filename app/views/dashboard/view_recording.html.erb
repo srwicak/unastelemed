@@ -1,0 +1,1202 @@
+<div class="recording-container">
+  <div class="recording-header">
+    <h1>Data Pemeriksaan</h1>
+    <div class="recording-info">
+      <p><strong>Pasien:</strong> <%= @recording.patient.name %></p>
+      <p><strong>Tanggal:</strong> <%= @recording.created_at.strftime('%d %B %Y %H:%M') %></p>
+      <% if @recording.user %>
+        <p><strong>Tenaga Medis:</strong> <%= @recording.user.name %></p>
+      <% end %>
+      <% if @session %>
+        <% if @session.qr_code %>
+          <p><strong>Kode Sesi:</strong> <%= @session.qr_code.code %></p>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="recording-content">
+    <div class="chart-section">
+      <h2>Grafik Data EKG</h2>
+      
+      <% if @batches.any? %>
+        <div class="chart-info">
+          <p><strong>Total Batches:</strong> <%= @batches.count %></p>
+          <p><strong>Total Samples:</strong> <%= @recording.total_samples || 'N/A' %></p>
+          <p><strong>Sample Rate:</strong> <%= @recording.sample_rate || 500 %> Hz</p>
+          <p><strong>Duration:</strong> <%= @recording.formatted_duration %></p>
+        </div>
+        
+        <div class="chart-container">
+          <canvas id="medicalChart" width="800" height="400"></canvas>
+        </div>
+      <% else %>
+        <div class="no-data-message">
+          <p>⏳ Belum ada data EKG yang tersedia.</p>
+          <% if @recording.status == 'recording' %>
+            <p>Recording sedang berlangsung. Data akan muncul setelah mobile app mengirim batch pertama.</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <% if @session && @interpretation.present? %>
+      <div class="interpretation-section">
+        <h2>Interpretasi Dokter</h2>
+        <div class="interpretation-card">
+          <% if @session.medical_staff %>
+            <p class="doctor-info">Dr. <%= @session.medical_staff.name %></p>
+          <% end %>
+          
+          <% if @session.diagnosis.present? %>
+            <div class="interpretation-item">
+              <h3>Diagnosis</h3>
+              <p><%= @session.diagnosis %></p>
+            </div>
+          <% end %>
+          
+          <div class="interpretation-item">
+            <h3>Catatan</h3>
+            <p><%= @interpretation %></p>
+          </div>
+          
+          <% if @session.recommendations.present? %>
+            <div class="interpretation-item">
+              <h3>Rekomendasi</h3>
+              <p><%= @session.recommendations %></p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% elsif @session && (current_user.medical_staff&.doctor?) %>
+      <div class="add-interpretation-section">
+        <h2>Tambahkan Interpretasi</h2>
+        <%= form_with url: add_interpretation_path, method: :post, local: true do |f| %>
+          <%= hidden_field_tag :id, @session.id %>
+          
+          <div class="form-group">
+            <%= f.label :diagnosis, "Diagnosis" %>
+            <%= f.text_area :diagnosis, class: "form-control", rows: 2, required: true %>
+          </div>
+          
+          <div class="form-group">
+            <%= f.label :doctor_notes, "Catatan Dokter" %>
+            <%= f.text_area :doctor_notes, class: "form-control", rows: 4, required: true %>
+          </div>
+          
+          <div class="form-group">
+            <%= f.label :recommendations, "Rekomendasi" %>
+            <%= f.text_area :recommendations, class: "form-control", rows: 3 %>
+          </div>
+          
+          <div class="form-actions">
+            <%= f.submit "Simpan Interpretasi", class: "btn btn-success" %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="waiting-interpretation">
+        <p>Hasil pemeriksaan sedang dalam proses interpretasi oleh dokter.</p>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="recording-actions">
+    <%= link_to "Kembali", :back, class: "btn btn-secondary" %>
+    <% if current_user.medical_staff %>
+      <%= link_to "Dashboard", dashboard_path, class: "btn btn-outline" %>
+    <% else %>
+      <%= link_to "Dashboard Pasien", patient_dashboard_path, class: "btn btn-outline" %>
+    <% end %>
+    <button onclick="exportChart()" class="btn btn-primary">Ekspor Grafik</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
+
+<div id="annotationModal" class="modal-overlay" style="display: none;">
+  <div class="modal-content">
+    <h3>Tambah Anotasi</h3>
+    <form id="annotationForm">
+      <div class="form-group">
+        <label>Tipe Marker:</label>
+        <div style="display: flex; gap: 12px;">
+          <label style="display: flex; align-items: center; gap: 4px;">
+            <input type="radio" name="markerType" value="point" checked>
+            <span>Titik (Point)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px;">
+            <input type="radio" name="markerType" value="range">
+            <span>Range (Interval)</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="startTimeSeconds">Waktu Mulai (detik):</label>
+        <input type="number" id="startTimeSeconds" class="form-control" step="0.001" min="0" required placeholder="Contoh: 5.250">
+        <small style="color: #6c757d;">Format: detik dari awal recording</small>
+      </div>
+      
+      <div class="form-group" id="endTimeGroup" style="display: none;">
+        <label for="endTimeSeconds">Waktu Akhir (detik):</label>
+        <input type="number" id="endTimeSeconds" class="form-control" step="0.001" min="0" placeholder="Contoh: 8.500">
+        <small style="color: #6c757d;">Opsional untuk marker range</small>
+      </div>
+      
+      <div class="form-group">
+        <label for="annotationLabel">Label / Kategori</label>
+        <select id="annotationLabel" class="form-control" required>
+          <option value="">-- Pilih Label --</option>
+          <option value="Aritmia">Aritmia</option>
+          <option value="Noise">Noise / Gangguan</option>
+          <option value="Artifact">Artifact</option>
+          <option value="Normal">Normal</option>
+          <option value="Abnormal QRS">Abnormal QRS</option>
+          <option value="ST Elevation">ST Elevation</option>
+          <option value="ST Depression">ST Depression</option>
+          <option value="T Wave">T Wave Abnormality</option>
+          <option value="Lainnya">Lainnya</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="annotationNotes">Catatan Tambahan</label>
+        <textarea id="annotationNotes" class="form-control" rows="3" placeholder="Deskripsi detail..."></textarea>
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" onclick="closeModal()" class="btn btn-secondary">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Anotasi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Configuration
+const RECORDING_ID = <%= @recording.id %>;
+const START_TIME = new Date("<%= (@recording.start_time || @recording.created_at).iso8601 %>").getTime();
+const RECORDING_END_TIME = new Date("<%= ((@recording.end_time || @recording.start_time || @recording.created_at) + (@recording.duration_seconds || 0).seconds).iso8601 %>").getTime();
+const TOTAL_DURATION = RECORDING_END_TIME - START_TIME;
+const INITIAL_WINDOW = 10 * 1000; // 10 seconds
+const BUFFER_SIZE = 20 * 1000; // Keep 20s buffer on each side
+
+// State
+let currentChart = null;
+let isLoading = false;
+let isAnnotationMode = false;
+let isDragging = false;
+let dragStartX = null;
+let dragStartTime = null;
+let dragEndTime = null;
+let selectionBox = null;
+let annotations = [];
+let loadedRanges = []; // Array of {start, end}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  initChart();
+  // Fetch initial window + buffer
+  fetchDataBuffered(START_TIME, Math.min(START_TIME + INITIAL_WINDOW, RECORDING_END_TIME));
+  fetchAnnotations();
+  setupControls();
+  setupDragSelection();
+  
+  document.getElementById('annotationForm').onsubmit = saveAnnotation;
+  
+  // Toggle end time field based on marker type
+  document.querySelectorAll('input[name="markerType"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      const endTimeGroup = document.getElementById('endTimeGroup');
+      if (this.value === 'range') {
+        endTimeGroup.style.display = 'block';
+      } else {
+        endTimeGroup.style.display = 'none';
+        document.getElementById('endTimeSeconds').value = '';
+      }
+    });
+  });
+});
+
+function setupControls() {
+  const controlsDiv = document.querySelector('.chart-controls') || createControlsDiv();
+  controlsDiv.innerHTML = '';
+  
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'btn btn-secondary btn-sm';
+  resetBtn.innerText = 'Reset View';
+  resetBtn.onclick = resetZoom;
+  resetBtn.style.marginRight = '10px';
+  
+  const annotateBtn = document.createElement('button');
+  annotateBtn.className = 'btn btn-outline btn-sm';
+  annotateBtn.id = 'annotateBtn';
+  annotateBtn.innerText = 'Mode Anotasi: OFF';
+  annotateBtn.onclick = toggleAnnotationMode;
+  annotateBtn.style.marginRight = '10px';
+  
+  const manualAnnotateBtn = document.createElement('button');
+  manualAnnotateBtn.className = 'btn btn-outline btn-sm';
+  manualAnnotateBtn.innerText = '+ Tambah Anotasi Manual';
+  manualAnnotateBtn.onclick = () => openModal(0);
+  manualAnnotateBtn.style.marginRight = '10px';
+  
+  const listAnnotationsBtn = document.createElement('button');
+  listAnnotationsBtn.className = 'btn btn-outline btn-sm';
+  listAnnotationsBtn.innerText = '📋 Lihat Daftar Anotasi';
+  listAnnotationsBtn.onclick = showAnnotationsList;
+  
+  controlsDiv.appendChild(resetBtn);
+  controlsDiv.appendChild(annotateBtn);
+  controlsDiv.appendChild(manualAnnotateBtn);
+  controlsDiv.appendChild(listAnnotationsBtn);
+}
+
+function createControlsDiv() {
+  const div = document.createElement('div');
+  div.className = 'chart-controls';
+  div.style.marginBottom = '10px';
+  document.querySelector('.chart-container').before(div);
+  return div;
+}
+
+// Custom EKG Grid Plugin
+const ekgGridPlugin = {
+  id: 'ekgGrid',
+  beforeDraw: (chart) => {
+    const ctx = chart.ctx;
+    const chartArea = chart.chartArea;
+    const yScale = chart.scales.y;
+    const xScale = chart.scales.x;
+    
+    // Background color (pink like EKG paper)
+    ctx.fillStyle = '#fff5f5';
+    ctx.fillRect(chartArea.left, chartArea.top, 
+                 chartArea.right - chartArea.left, 
+                 chartArea.bottom - chartArea.top);
+    
+    // Calculate grid spacing
+    // Y-axis: 10mm/mV, so 0.1mV per small square
+    const smallSquareY = 0.1; // mV
+    const largeSquareY = 0.5; // mV (5 small squares)
+    
+    // X-axis: 25mm/sec, so 0.04s per small square
+    const smallSquareX = 0.04; // seconds
+    const largeSquareX = 0.2; // seconds (5 small squares)
+    
+    // Draw small grid (1mm squares)
+    ctx.strokeStyle = '#ffcccc';
+    ctx.lineWidth = 0.5;
+    
+    // Vertical lines (time)
+    const xMin = xScale.min;
+    const xMax = xScale.max;
+    for (let x = Math.floor(xMin / smallSquareX) * smallSquareX; 
+         x <= xMax; 
+         x += smallSquareX) {
+      const pixel = xScale.getPixelForValue(x);
+      ctx.beginPath();
+      ctx.moveTo(pixel, chartArea.top);
+      ctx.lineTo(pixel, chartArea.bottom);
+      ctx.stroke();
+    }
+    
+    // Horizontal lines (voltage)
+    const yMin = yScale.min;
+    const yMax = yScale.max;
+    for (let y = Math.floor(yMin / smallSquareY) * smallSquareY; 
+         y <= yMax; 
+         y += smallSquareY) {
+      const pixel = yScale.getPixelForValue(y);
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, pixel);
+      ctx.lineTo(chartArea.right, pixel);
+      ctx.stroke();
+    }
+    
+    // Draw large grid (5mm squares)
+    ctx.strokeStyle = '#ff9999';
+    ctx.lineWidth = 1.0;
+    
+    // Vertical lines
+    for (let x = Math.floor(xMin / largeSquareX) * largeSquareX; 
+         x <= xMax; 
+         x += largeSquareX) {
+      const pixel = xScale.getPixelForValue(x);
+      ctx.beginPath();
+      ctx.moveTo(pixel, chartArea.top);
+      ctx.lineTo(pixel, chartArea.bottom);
+      ctx.stroke();
+    }
+    
+    // Horizontal lines
+    for (let y = Math.floor(yMin / largeSquareY) * largeSquareY; 
+         y <= yMax; 
+         y += largeSquareY) {
+      const pixel = yScale.getPixelForValue(y);
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, pixel);
+      ctx.lineTo(chartArea.right, pixel);
+      ctx.stroke();
+    }
+  }
+};
+
+function initChart() {
+  const ctx = document.getElementById('medicalChart').getContext('2d');
+  
+  currentChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'EKG Signal (mV)',
+        data: [],
+        borderColor: '#000000',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        tension: 0,
+        pointRadius: 0,
+        fill: false,
+        spanGaps: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      parsing: false,
+      normalized: true,
+      onClick: handleChartClick,
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: 10,
+          title: { 
+            display: true, 
+            text: 'Waktu (detik) - Kecepatan: 25mm/detik',
+            font: { size: 12, weight: 'bold' }
+          },
+          ticks: {
+            stepSize: 1,
+            callback: function(value) {
+              return value.toFixed(1) + 's';
+            }
+          },
+          grid: {
+            display: false
+          }
+        },
+        y: {
+          min: -2.0,
+          max: 2.0,
+          title: { 
+            display: true, 
+            text: 'Amplitudo (mV) - Skala: 10mm/mV',
+            font: { size: 12, weight: 'bold' }
+          },
+          ticks: {
+            stepSize: 0.5,
+            callback: function(value) {
+              return value.toFixed(1) + ' mV';
+            }
+          },
+          grid: {
+            display: false
+          }
+        }
+      },
+      plugins: {
+        zoom: {
+          limits: {
+            x: { min: 0, max: 3600 },
+            y: { min: -2.0, max: 2.0 }
+          },
+          pan: {
+            enabled: true,
+            mode: 'x',
+            onPanComplete: handlePanZoom
+          },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x',
+            onZoomComplete: handlePanZoom
+          }
+        },
+        annotation: { annotations: {} },
+        tooltip: { enabled: true, mode: 'index', intersect: false }
+      }
+    },
+    plugins: [ekgGridPlugin]
+  });
+}
+
+// Debounced handler for pan/zoom
+const handlePanZoom = debounce(function({chart}) {
+  const {min, max} = chart.scales.x;
+  checkBuffer(min, max);
+}, 100);
+
+function checkBuffer(visibleStartSec, visibleEndSec) {
+  // Convert seconds to milliseconds for API calls
+  const visibleStartMs = START_TIME + (visibleStartSec * 1000);
+  const visibleEndMs = START_TIME + (visibleEndSec * 1000);
+  
+  const bufferSizeMs = BUFFER_SIZE;
+  const desiredStartMs = Math.max(START_TIME, visibleStartMs - bufferSizeMs);
+  const desiredEndMs = Math.min(RECORDING_END_TIME, visibleEndMs + bufferSizeMs);
+  
+  // Check if desired range is covered by ANY loaded range
+  const isCovered = loadedRanges.some(r => r.start <= desiredStartMs && r.end >= desiredEndMs);
+  
+  if (!isCovered) {
+    fetchDataBuffered(desiredStartMs, desiredEndMs);
+  }
+}
+
+async function fetchDataBuffered(startTimeMs, endTimeMs) {
+  if (isLoading) return;
+  isLoading = true;
+  
+  try {
+    const startIso = new Date(startTimeMs).toISOString();
+    const endIso = new Date(endTimeMs).toISOString();
+    
+    const response = await fetch(`/recordings/${RECORDING_ID}/data?start_time=${startIso}&end_time=${endIso}`);
+    const result = await response.json();
+    
+    // Update loaded ranges
+    loadedRanges = [{start: startTimeMs, end: endTimeMs}];
+    
+    updateChartData(result, startTimeMs);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  } finally {
+    isLoading = false;
+  }
+}
+
+function updateChartData(result, startTimeMs) {
+  if (!currentChart) return;
+  
+  let newData = [];
+  
+  if (result.type === 'summary') {
+    result.data.forEach(d => {
+      // Convert timestamp to seconds from recording start
+      const seconds = (d.t - START_TIME) / 1000;
+      newData.push({ x: seconds, y: d.min });
+      newData.push({ x: seconds, y: d.max });
+    });
+    newData.sort((a, b) => a.x - b.x);
+  } else {
+    // Convert timestamps to seconds from recording start
+    result.data.forEach(d => {
+      const seconds = (d.x - START_TIME) / 1000;
+      newData.push({ x: seconds, y: d.y });
+    });
+    newData.sort((a, b) => a.x - b.x);
+  }
+  
+  currentChart.data.datasets[0].data = newData;
+  currentChart.update('none');
+}
+
+function toggleAnnotationMode() {
+  isAnnotationMode = !isAnnotationMode;
+  const btn = document.getElementById('annotateBtn');
+  if (isAnnotationMode) {
+    btn.innerText = '🎯 Mode Anotasi: ON (Klik/Drag di grafik)';
+    btn.classList.remove('btn-outline');
+    btn.classList.add('btn-primary');
+    document.getElementById('medicalChart').style.cursor = 'crosshair';
+    currentChart.options.plugins.zoom.pan.enabled = false;
+    currentChart.options.plugins.zoom.zoom.wheel.enabled = false;
+    currentChart.options.plugins.zoom.zoom.pinch.enabled = false;
+  } else {
+    btn.innerText = 'Mode Anotasi: OFF';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-outline');
+    document.getElementById('medicalChart').style.cursor = 'default';
+    currentChart.options.plugins.zoom.pan.enabled = true;
+    currentChart.options.plugins.zoom.zoom.wheel.enabled = true;
+    currentChart.options.plugins.zoom.zoom.pinch.enabled = true;
+  }
+  currentChart.update('none');
+}
+
+function handleChartClick(event, elements, chart) {
+  // Click handled by drag system now
+}
+
+function setupDragSelection() {
+  const canvas = document.getElementById('medicalChart');
+  
+  canvas.addEventListener('mousedown', function(e) {
+    if (!isAnnotationMode) return;
+    
+    isDragging = true;
+    const rect = canvas.getBoundingClientRect();
+    dragStartX = e.clientX - rect.left;
+    
+    const canvasPos = Chart.helpers.getRelativePosition(e, currentChart);
+    const xScale = currentChart.scales.x;
+    dragStartTime = xScale.getValueForPixel(canvasPos.x);
+    dragEndTime = null;
+    
+    // Create selection box element
+    if (!selectionBox) {
+      selectionBox = document.createElement('div');
+      selectionBox.style.position = 'absolute';
+      selectionBox.style.border = '2px dashed #667eea';
+      selectionBox.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+      selectionBox.style.pointerEvents = 'none';
+      selectionBox.style.zIndex = '100';
+      canvas.parentElement.style.position = 'relative';
+      canvas.parentElement.appendChild(selectionBox);
+    }
+    
+    selectionBox.style.display = 'none';
+  });
+  
+  canvas.addEventListener('mousemove', function(e) {
+    if (!isDragging || !isAnnotationMode) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    
+    const canvasPos = Chart.helpers.getRelativePosition(e, currentChart);
+    const xScale = currentChart.scales.x;
+    dragEndTime = xScale.getValueForPixel(canvasPos.x);
+    
+    // Update selection box
+    const left = Math.min(dragStartX, currentX);
+    const width = Math.abs(currentX - dragStartX);
+    
+    const chartArea = currentChart.chartArea;
+    selectionBox.style.left = left + 'px';
+    selectionBox.style.top = chartArea.top + 'px';
+    selectionBox.style.width = width + 'px';
+    selectionBox.style.height = (chartArea.bottom - chartArea.top) + 'px';
+    selectionBox.style.display = 'block';
+  });
+  
+  canvas.addEventListener('mouseup', function(e) {
+    if (!isDragging || !isAnnotationMode) return;
+    
+    isDragging = false;
+    
+    if (selectionBox) {
+      selectionBox.style.display = 'none';
+    }
+    
+    // Determine if it's a click or drag
+    const rect = canvas.getBoundingClientRect();
+    const endX = e.clientX - rect.left;
+    const dragDistance = Math.abs(endX - dragStartX);
+    
+    if (dragDistance < 5) {
+      // It's a click - create point marker
+      openModalForPoint(dragStartTime);
+    } else {
+      // It's a drag - create range marker
+      const canvasPos = Chart.helpers.getRelativePosition(e, currentChart);
+      const xScale = currentChart.scales.x;
+      dragEndTime = xScale.getValueForPixel(canvasPos.x);
+      
+      if (dragStartTime !== null && dragEndTime !== null) {
+        openModalForRange(dragStartTime, dragEndTime);
+      }
+    }
+  });
+  
+  canvas.addEventListener('mouseleave', function() {
+    if (isDragging && selectionBox) {
+      selectionBox.style.display = 'none';
+    }
+    isDragging = false;
+  });
+}
+
+function openModalForPoint(timeInSeconds) {
+  // Populate form untuk point marker
+  document.getElementById('startTimeSeconds').value = timeInSeconds.toFixed(3);
+  document.querySelector('input[name="markerType"][value="point"]').checked = true;
+  document.getElementById('endTimeGroup').style.display = 'none';
+  document.getElementById('endTimeSeconds').value = '';
+  document.getElementById('annotationLabel').value = '';
+  document.getElementById('annotationNotes').value = '';
+  
+  document.getElementById('annotationModal').style.display = 'flex';
+}
+
+function openModalForRange(startTime, endTime) {
+  // Sort times
+  const start = Math.min(startTime, endTime);
+  const end = Math.max(startTime, endTime);
+  
+  // Populate form untuk range marker
+  document.getElementById('startTimeSeconds').value = start.toFixed(3);
+  document.getElementById('endTimeSeconds').value = end.toFixed(3);
+  document.querySelector('input[name="markerType"][value="range"]').checked = true;
+  document.getElementById('endTimeGroup').style.display = 'block';
+  document.getElementById('annotationLabel').value = '';
+  document.getElementById('annotationNotes').value = '';
+  
+  document.getElementById('annotationModal').style.display = 'flex';
+}
+
+function openModal(timeInSeconds) {
+  openModalForPoint(timeInSeconds);
+}
+
+function closeModal() {
+  document.getElementById('annotationModal').style.display = 'none';
+  document.getElementById('annotationForm').reset();
+}
+
+async function saveAnnotation(e) {
+  e.preventDefault();
+  
+  const markerType = document.querySelector('input[name="markerType"]:checked').value;
+  const startTimeSeconds = parseFloat(document.getElementById('startTimeSeconds').value);
+  const label = document.getElementById('annotationLabel').value;
+  const notes = document.getElementById('annotationNotes').value;
+  
+  // Validasi input
+  if (!label) {
+    alert('❌ Label harus diisi!');
+    return;
+  }
+  
+  if (isNaN(startTimeSeconds) || startTimeSeconds < 0) {
+    alert('❌ Waktu mulai tidak valid!');
+    return;
+  }
+  
+  const payload = {
+    annotation: {
+      start_time_seconds: startTimeSeconds,
+      label: label,
+      notes: notes || ''
+    }
+  };
+  
+  // Tambahkan end_time jika marker type adalah range
+  if (markerType === 'range') {
+    const endTimeSecondsInput = document.getElementById('endTimeSeconds').value;
+    if (!endTimeSecondsInput) {
+      alert('❌ Waktu akhir harus diisi untuk marker range!');
+      return;
+    }
+    
+    const endTimeSeconds = parseFloat(endTimeSecondsInput);
+    if (isNaN(endTimeSeconds)) {
+      alert('❌ Waktu akhir tidak valid!');
+      return;
+    }
+    
+    if (endTimeSeconds <= startTimeSeconds) {
+      alert('❌ Waktu akhir harus lebih besar dari waktu mulai!');
+      return;
+    }
+    
+    payload.annotation.end_time_seconds = endTimeSeconds;
+  }
+  
+  console.log('Saving annotation:', payload);
+  
+  try {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!csrfToken) {
+      alert('❌ CSRF token tidak ditemukan!');
+      return;
+    }
+    
+    const response = await fetch(`/recordings/${RECORDING_ID}/annotations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      alert('❌ Server response tidak valid');
+      return;
+    }
+    
+    console.log('Server response:', response.status, result);
+    
+    if (response.ok) {
+      closeModal();
+      await fetchAnnotations();
+      alert('✓ Anotasi berhasil disimpan!');
+    } else {
+      const errorMsg = result.errors ? result.errors.join(', ') : (result.error || 'Gagal menyimpan anotasi');
+      alert('❌ ' + errorMsg);
+      console.error('Save error:', result);
+    }
+  } catch (error) {
+    console.error('Error saving annotation:', error);
+    alert('❌ Terjadi kesalahan saat menyimpan: ' + error.message);
+  }
+}
+
+async function fetchAnnotations() {
+  try {
+    const response = await fetch(`/recordings/${RECORDING_ID}/annotations`);
+    const data = await response.json();
+    annotations = data;
+    updateChartAnnotations();
+  } catch (error) {
+    console.error('Error fetching annotations:', error);
+  }
+}
+
+function showAnnotationsList() {
+  if (annotations.length === 0) {
+    alert('Belum ada anotasi untuk recording ini.');
+    return;
+  }
+  
+  let html = '<div class="annotations-list-modal modal-overlay" style="display: flex;">';
+  html += '<div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">';
+  html += '<h3>Daftar Anotasi (' + annotations.length + ')</h3>';
+  html += '<div style="margin-bottom: 16px;">';
+  
+  annotations.forEach((ann, idx) => {
+    const startSeconds = ((new Date(ann.start_time).getTime() - START_TIME) / 1000).toFixed(3);
+    const typeLabel = ann.marker_type === 'point' ? '📍 Titik' : '📏 Range';
+    const typeColor = ann.marker_type === 'point' ? '#ff6384' : '#36a2eb';
+    
+    html += '<div style="border: 2px solid ' + typeColor + '; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white;">';
+    html += '<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">';
+    html += '<div>';
+    html += '<strong style="color: ' + typeColor + ';">' + typeLabel + ' - ' + ann.label + '</strong><br>';
+    html += '<small style="color: #6c757d;">Waktu: ' + startSeconds + 's';
+    
+    if (ann.marker_type === 'range') {
+      const endSeconds = ((new Date(ann.end_time).getTime() - START_TIME) / 1000).toFixed(3);
+      html += ' → ' + endSeconds + 's (durasi: ' + ann.duration_seconds + 's)';
+    }
+    
+    html += '</small><br>';
+    if (ann.notes) {
+      html += '<small style="color: #495057;">' + ann.notes + '</small><br>';
+    }
+    if (ann.created_by) {
+      html += '<small style="color: #6c757d;">Oleh: ' + ann.created_by.name + '</small>';
+    }
+    html += '</div>';
+    html += '<button onclick="deleteAnnotation(' + ann.id + ')" class="btn btn-sm" style="background: #dc3545; color: white; padding: 4px 8px;">Hapus</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  
+  html += '</div>';
+  html += '<div class="form-actions"><button onclick="closeAnnotationsList()" class="btn btn-secondary">Tutup</button></div>';
+  html += '</div></div>';
+  
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeAnnotationsList() {
+  const modal = document.querySelector('.annotations-list-modal');
+  if (modal) modal.remove();
+}
+
+async function deleteAnnotation(annotationId) {
+  if (!confirm('Yakin ingin menghapus anotasi ini?')) return;
+  
+  try {
+    const response = await fetch(`/recordings/${RECORDING_ID}/annotations/${annotationId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+      }
+    });
+    
+    if (response.ok) {
+      alert('✓ Anotasi berhasil dihapus');
+      closeAnnotationsList();
+      fetchAnnotations();
+    } else {
+      alert('❌ Gagal menghapus anotasi');
+    }
+  } catch (error) {
+    console.error('Error deleting annotation:', error);
+    alert('❌ Terjadi kesalahan');
+  }
+}
+
+function updateChartAnnotations() {
+  if (!currentChart) return;
+  
+  const annotationConfigs = {};
+  
+  annotations.forEach((ann, index) => {
+    const startSeconds = (new Date(ann.start_time).getTime() - START_TIME) / 1000;
+    
+    if (ann.marker_type === 'point') {
+      // Marker titik - garis vertikal merah
+      annotationConfigs['point_' + ann.id] = {
+        type: 'line',
+        xMin: startSeconds,
+        xMax: startSeconds,
+        borderColor: 'rgb(255, 99, 132)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: ann.label,
+          position: 'start',
+          backgroundColor: 'rgba(255, 99, 132, 0.8)',
+          color: 'white',
+          font: { size: 10, weight: 'bold' },
+          padding: 4
+        }
+      };
+    } else {
+      // Marker range - box dengan highlight
+      const endSeconds = (new Date(ann.end_time).getTime() - START_TIME) / 1000;
+      
+      annotationConfigs['range_' + ann.id] = {
+        type: 'box',
+        xMin: startSeconds,
+        xMax: endSeconds,
+        backgroundColor: 'rgba(54, 162, 235, 0.15)',
+        borderColor: 'rgb(54, 162, 235)',
+        borderWidth: 2,
+        label: {
+          display: true,
+          content: ann.label + ' (' + ann.duration_seconds + 's)',
+          position: 'center',
+          backgroundColor: 'rgba(54, 162, 235, 0.9)',
+          color: 'white',
+          font: { size: 10, weight: 'bold' },
+          padding: 4
+        }
+      };
+    }
+  });
+  
+  currentChart.options.plugins.annotation.annotations = annotationConfigs;
+  currentChart.update('none');
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function resetZoom() {
+  if (currentChart) {
+    currentChart.resetZoom();
+    currentChart.scales.x.min = 0;
+    currentChart.scales.x.max = 10;
+    currentChart.update();
+    fetchDataBuffered(START_TIME, START_TIME + INITIAL_WINDOW + BUFFER_SIZE);
+  }
+}
+
+// Auto refresh logic
+<% if @recording.status == 'recording' %>
+setInterval(function() {
+  const {max} = currentChart.scales.x;
+  if (max >= RECORDING_END_TIME - 5000) {
+     location.reload();
+  }
+}, 30000);
+<% end %>
+</script>
+
+<style>
+.recording-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.recording-header {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.recording-header h1 {
+  color: #2c3e50;
+  margin-bottom: 16px;
+}
+
+.recording-info p {
+  margin: 4px 0;
+  color: #7f8c8d;
+}
+
+.recording-content {
+  display: grid;
+  gap: 24px;
+}
+
+.chart-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.chart-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+.chart-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.chart-info p {
+  margin: 0;
+  color: #495057;
+}
+
+.chart-info strong {
+  color: #2c3e50;
+}
+
+.no-data-message {
+  text-align: center;
+  padding: 48px 24px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  color: #6c757d;
+}
+
+.no-data-message p:first-child {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.chart-container {
+  position: relative;
+  height: 400px;
+  margin-bottom: 20px;
+}
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.interpretation-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.interpretation-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+.interpretation-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.doctor-info {
+  color: #3498db;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.interpretation-item {
+  margin-bottom: 20px;
+}
+
+.interpretation-item h3 {
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.interpretation-item p {
+  color: #7f8c8d;
+  line-height: 1.6;
+}
+
+.add-interpretation-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.add-interpretation-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e1e8ed;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.waiting-interpretation {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: #856404;
+}
+
+.recording-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5a6fd8;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-outline:hover {
+  background: #667eea;
+  color: white;
+}
+
+.btn-success {
+  background: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #218838;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #2c3e50;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+</style>

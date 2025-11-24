@@ -1,0 +1,325 @@
+<% content_for :skip_navbar, true %>
+<% content_for :skip_container, true %>
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+  <!-- Header -->
+  <div class="bg-white shadow-md border-b border-gray-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+          <%= link_to nurse_dashboard_path, class: "inline-flex items-center text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors" do %>
+            <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Kembali ke Dashboard
+          <% end %>
+        </div>
+        
+        <!-- Status Badge -->
+        <% if @qr_code.is_used %>
+          <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-green-100 text-green-800 border-2 border-green-200">
+            <svg class="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            Sudah Digunakan
+          </span>
+        <% elsif @qr_code.expired? %>
+          <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-red-100 text-red-800 border-2 border-red-200">
+            <svg class="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+            Expired
+          </span>
+        <% else %>
+          <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-yellow-100 text-yellow-800 border-2 border-yellow-200">
+            <svg class="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+            </svg>
+            Aktif
+          </span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Left Column: QR Code -->
+      <div class="lg:col-span-1">
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 sticky top-8">
+          <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white">QR Code</h2>
+          </div>
+          
+          <div class="p-6">
+            <!-- QR Code Container -->
+            <div class="bg-white rounded-xl border-4 border-gray-200 p-6 mb-6 flex items-center justify-center">
+              <div id="qr-display" style="width: 250px; height: 250px;">
+                <%= @qr_code.to_qr_svg.html_safe %>
+              </div>
+            </div>
+            
+            <!-- Code Display -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+              <p class="text-xs font-semibold text-gray-600 mb-2">Session ID</p>
+              <code class="text-sm font-mono text-gray-900 break-all font-bold"><%= @qr_code.recording_session&.session_id || 'N/A' %></code>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="space-y-3">
+              <button onclick="printQR()" class="w-full inline-flex justify-center items-center px-4 py-3 border-2 border-gray-300 rounded-xl shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 hover:border-indigo-400 transition-all">
+                <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print QR Code
+              </button>
+              
+              <button onclick="downloadQR()" class="w-full inline-flex justify-center items-center px-4 py-3 border-2 border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all">
+                <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download PNG
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Details -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Session Information -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+          <div class="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
+            <h2 class="text-xl font-bold text-white">Informasi Sesi</h2>
+          </div>
+          
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Session ID</p>
+                <code class="text-base font-mono text-gray-900 font-bold break-all"><%= @qr_code.recording_session&.session_id || 'N/A' %></code>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Status Sesi</p>
+                <% if @qr_code.recording_session %>
+                  <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold 
+                    <%= @qr_code.recording_session.status == 'active' ? 'bg-green-100 text-green-800' : 
+                        @qr_code.recording_session.status == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                        'bg-gray-100 text-gray-800' %>">
+                    <%= @qr_code.recording_session.status&.capitalize %>
+                  </span>
+                <% else %>
+                  <span class="text-gray-400">Tidak ada sesi</span>
+                <% end %>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Durasi Maksimal</p>
+                <p class="text-base font-bold text-gray-900"><%= @qr_code.max_duration_minutes %> menit</p>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Dibuat</p>
+                <p class="text-base font-bold text-gray-900"><%= @qr_code.created_at.strftime('%d %b %Y, %H:%M') %></p>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Berlaku Dari</p>
+                <p class="text-base font-bold text-gray-900"><%= @qr_code.valid_from.strftime('%d %b %Y, %H:%M') %></p>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Berlaku Sampai</p>
+                <p class="text-base font-bold text-gray-900"><%= @qr_code.valid_until.strftime('%d %b %Y, %H:%M') %></p>
+              </div>
+
+              <% if @qr_code.is_used && @qr_code.used_at %>
+                <div class="bg-green-50 rounded-lg p-4 border-2 border-green-200 md:col-span-2">
+                  <p class="text-sm font-semibold text-green-700 mb-2">✓ Digunakan Pada</p>
+                  <p class="text-base font-bold text-green-900"><%= @qr_code.used_at.strftime('%d %B %Y, %H:%M WIB') %></p>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Patient Information -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+          <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4">
+            <h2 class="text-xl font-bold text-white">Informasi Pasien</h2>
+          </div>
+          
+          <div class="p-6">
+            <% if @qr_code.patient %>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <p class="text-sm font-semibold text-gray-600 mb-2">Nama Pasien</p>
+                  <p class="text-base font-bold text-gray-900"><%= @qr_code.patient.name %></p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <p class="text-sm font-semibold text-gray-600 mb-2">Patient ID</p>
+                  <code class="text-sm font-mono text-gray-900 font-bold"><%= @qr_code.patient.patient_identifier %></code>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <p class="text-sm font-semibold text-gray-600 mb-2">Tanggal Lahir</p>
+                  <p class="text-base font-bold text-gray-900"><%= @qr_code.patient.date_of_birth&.strftime('%d %B %Y') || 'N/A' %></p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <p class="text-sm font-semibold text-gray-600 mb-2">Jenis Kelamin</p>
+                  <p class="text-base font-bold text-gray-900"><%= @qr_code.patient.gender == 'male' ? 'Laki-laki' : 'Perempuan' %></p>
+                </div>
+                
+                <% if @qr_code.patient.blood_type.present? %>
+                  <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-gray-600 mb-2">Golongan Darah</p>
+                    <p class="text-base font-bold text-gray-900"><%= @qr_code.patient.blood_type %></p>
+                  </div>
+                <% end %>
+                
+                <% if @qr_code.patient.phone_number.present? %>
+                  <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-gray-600 mb-2">No. Telepon</p>
+                    <p class="text-base font-bold text-gray-900"><%= @qr_code.patient.phone_number %></p>
+                  </div>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="text-sm text-gray-500 italic text-center py-8">Tidak ada informasi pasien</p>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Healthcare Provider Information -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+          <div class="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
+            <h2 class="text-xl font-bold text-white">Dibuat Oleh</h2>
+          </div>
+          
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Nama</p>
+                <p class="text-base font-bold text-gray-900"><%= @qr_code.healthcare_provider&.name || 'N/A' %></p>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Role</p>
+                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
+                  <%= @qr_code.healthcare_provider&.role&.capitalize || 'N/A' %>
+                </span>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4 md:col-span-2">
+                <p class="text-sm font-semibold text-gray-600 mb-2">Rumah Sakit</p>
+                <p class="text-base font-bold text-gray-900"><%= @qr_code.hospital&.name || 'N/A' %></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function printQR() {
+  window.print();
+}
+
+function downloadQR() {
+  const qrContainer = document.getElementById('qr-display');
+  const svg = qrContainer.querySelector('svg');
+  
+  if (!svg) {
+    alert('QR Code tidak ditemukan');
+    return;
+  }
+  
+  // Clone and resize SVG
+  const svgClone = svg.cloneNode(true);
+  svgClone.setAttribute('width', '1000');
+  svgClone.setAttribute('height', '1000');
+  
+  const svgData = new XMLSerializer().serializeToString(svgClone);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1000;
+  canvas.height = 1000;
+  const ctx = canvas.getContext('2d');
+  
+  // White background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, 1000, 1000);
+  
+  const img = new Image();
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0, 1000, 1000);
+    
+    canvas.toBlob(function(blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'qr-code-<%= @qr_code.recording_session&.session_id || @qr_code.id %>.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  };
+  
+  img.onerror = function() {
+    alert('Gagal mengonversi QR Code');
+  };
+  
+  const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+  const svgUrl = URL.createObjectURL(svgBlob);
+  img.src = svgUrl;
+}
+</script>
+
+<style>
+#qr-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#qr-display svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 250px !important;
+  max-height: 250px !important;
+  display: block;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #qr-display, #qr-display * {
+    visibility: visible;
+  }
+  
+  #qr-display {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px !important;
+    height: 400px !important;
+  }
+  
+  #qr-display svg {
+    max-width: 400px !important;
+    max-height: 400px !important;
+  }
+}
+</style>
+</style>

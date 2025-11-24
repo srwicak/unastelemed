@@ -1,0 +1,316 @@
+<div class="hospitals-container">
+  <div class="page-header">
+    <div>
+      <h1>🏥 Manajemen Rumah Sakit</h1>
+      <p class="subtitle">Kelola data rumah sakit yang terdaftar di sistem</p>
+    </div>
+    <% if current_user.superuser? %>
+      <%= link_to new_hospital_path, class: "btn btn-primary" do %>
+        <i class="fas fa-plus"></i> Daftarkan Rumah Sakit Baru
+      <% end %>
+    <% end %>
+  </div>
+
+  <% if @hospitals.any? %>
+    <div class="hospitals-grid">
+      <% @hospitals.each do |hospital| %>
+        <div class="hospital-card">
+          <div class="hospital-header">
+            <div>
+              <h3><%= hospital.name %></h3>
+              <span class="hospital-code"><%= hospital.code %></span>
+            </div>
+            <% if current_user.superuser? %>
+              <div class="hospital-actions">
+                <%= link_to edit_hospital_path(hospital), class: "btn-icon", title: "Edit" do %>
+                  <i class="fas fa-edit"></i>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+
+          <div class="hospital-body">
+            <div class="info-row">
+              <i class="fas fa-map-marker-alt"></i>
+              <span><%= hospital.address %></span>
+            </div>
+            <div class="info-row">
+              <i class="fas fa-phone"></i>
+              <span><%= hospital.phone %></span>
+            </div>
+            <div class="info-row">
+              <i class="fas fa-envelope"></i>
+              <span><%= hospital.email %></span>
+            </div>
+          </div>
+
+          <div class="hospital-footer">
+            <div class="hospital-stats">
+              <div class="stat-item">
+                <span class="stat-number"><%= User.where(hospital_id: hospital.id, role: 'hospital_manager').count %></span>
+                <span class="stat-label">Manager</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number"><%= User.where(hospital_id: hospital.id, role: 'doctor').count %></span>
+                <span class="stat-label">Dokter</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number"><%= User.where(hospital_id: hospital.id, role: 'nurse').count %></span>
+                <span class="stat-label">Perawat</span>
+              </div>
+            </div>
+            <%= link_to "Lihat Detail", hospital_path(hospital), class: "btn btn-sm btn-outline" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="empty-state">
+      <i class="fas fa-hospital text-8xl text-gray-300 mb-4"></i>
+      <h3>Belum Ada Rumah Sakit Terdaftar</h3>
+      <p>Mulai dengan mendaftarkan rumah sakit pertama Anda</p>
+      <% if current_user.superuser? %>
+        <%= link_to new_hospital_path, class: "btn btn-primary btn-lg" do %>
+          <i class="fas fa-plus"></i> Daftarkan Rumah Sakit
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<style>
+.hospitals-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #3498db;
+}
+
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 5px 0;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  margin: 0;
+  font-size: 15px;
+}
+
+.hospitals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 25px;
+}
+
+.hospital-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  overflow: hidden;
+  transition: all 0.3s;
+  border: 2px solid transparent;
+}
+
+.hospital-card:hover {
+  border-color: #3498db;
+  box-shadow: 0 8px 24px rgba(52, 152, 219, 0.2);
+  transform: translateY(-4px);
+}
+
+.hospital-header {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  padding: 20px;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+
+.hospital-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.hospital-code {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.hospital-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.btn-icon:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.hospital-body {
+  padding: 20px;
+}
+
+.info-row {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #555;
+}
+
+.info-row i {
+  color: #3498db;
+  margin-top: 2px;
+  width: 16px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.hospital-footer {
+  padding: 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #ecf0f1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hospital-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2c3e50;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 16px;
+}
+
+.btn-outline {
+  background: white;
+  color: #3498db;
+  border: 2px solid #3498db;
+}
+
+.btn-outline:hover {
+  background: #3498db;
+  color: white;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 100px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.empty-state h3 {
+  font-size: 24px;
+  color: #2c3e50;
+  margin: 20px 0 10px 0;
+}
+
+.empty-state p {
+  color: #7f8c8d;
+  font-size: 16px;
+  margin-bottom: 30px;
+}
+
+.text-gray-300 {
+  color: #dee2e6;
+}
+
+@media (max-width: 768px) {
+  .hospitals-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+}
+</style>

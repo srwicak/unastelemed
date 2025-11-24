@@ -1,0 +1,27 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  recording: one
+  upload_id: MyString
+  session_id: MyString
+  file_name: MyString
+  file_size: 
+  chunk_size: 1
+  total_chunks: 1
+  chunks_received: 
+  chunks_received_count: 1
+  file_sha256: MyString
+  status: MyString
+
+two:
+  recording: two
+  upload_id: MyString
+  session_id: MyString
+  file_name: MyString
+  file_size: 
+  chunk_size: 1
+  total_chunks: 1
+  chunks_received: 
+  chunks_received_count: 1
+  file_sha256: MyString
+  status: MyString

@@ -1,0 +1,304 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>Manajemen Pendaftaran Tenaga Medis</h1>
+    <p class="dashboard-subtitle">Review dan approve pendaftaran dokter & perawat</p>
+  </div>
+
+  <!-- Pending Registrations -->
+  <div class="section-card">
+    <div class="section-header">
+      <h2 class="section-title">
+        <span class="badge badge-warning"><%= @pending_registrations.count %></span>
+        Pendaftaran Menunggu Persetujuan
+      </h2>
+    </div>
+
+    <% if @pending_registrations.any? %>
+      <div class="registrations-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Posisi</th>
+              <th>No. Izin Praktik</th>
+              <th>Spesialisasi</th>
+              <th>Rumah Sakit</th>
+              <th>Tanggal Daftar</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @pending_registrations.each do |staff| %>
+              <tr>
+                <td>
+                  <strong><%= staff.name %></strong><br>
+                  <small><%= staff.user.email %></small>
+                </td>
+                <td>
+                  <% if staff.role == 'doctor' %>
+                    <span class="badge badge-primary">Dokter</span>
+                  <% else %>
+                    <span class="badge badge-info">Perawat</span>
+                  <% end %>
+                </td>
+                <td><%= staff.license_number %></td>
+                <td><%= staff.specialization %></td>
+                <td><%= staff.hospital&.name || '-' %></td>
+                <td><%= staff.created_at.strftime('%d %b %Y') %></td>
+                <td>
+                  <div class="action-buttons">
+                    <%= button_to "✓ Setujui", 
+                        approve_medical_staff_registration_path(staff), 
+                        method: :patch, 
+                        class: "btn btn-sm btn-success",
+                        data: { confirm: "Yakin ingin menyetujui #{staff.name}?" } %>
+                    <%= button_to "✗ Tolak", 
+                        reject_medical_staff_registration_path(staff), 
+                        method: :patch, 
+                        class: "btn btn-sm btn-danger",
+                        data: { confirm: "Yakin ingin menolak #{staff.name}?" } %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="no-data">Tidak ada pendaftaran yang menunggu persetujuan.</p>
+    <% end %>
+  </div>
+
+  <!-- Approved Registrations -->
+  <div class="section-card">
+    <div class="section-header">
+      <h2 class="section-title">
+        <span class="badge badge-success"><%= @approved_registrations.count %></span>
+        Pendaftaran Disetujui (20 Terakhir)
+      </h2>
+    </div>
+
+    <% if @approved_registrations.any? %>
+      <div class="registrations-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Posisi</th>
+              <th>Rumah Sakit</th>
+              <th>Disetujui Oleh</th>
+              <th>Tanggal Disetujui</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @approved_registrations.each do |staff| %>
+              <tr>
+                <td>
+                  <strong><%= staff.name %></strong><br>
+                  <small><%= staff.user.email %></small>
+                </td>
+                <td>
+                  <% if staff.role == 'doctor' %>
+                    <span class="badge badge-primary">Dokter</span>
+                  <% else %>
+                    <span class="badge badge-info">Perawat</span>
+                  <% end %>
+                </td>
+                <td><%= staff.hospital&.name || '-' %></td>
+                <td>
+                  <% if staff.approved_by %>
+                    <%= User.find_by(id: staff.approved_by)&.name || 'Admin' %>
+                  <% else %>
+                    -
+                  <% end %>
+                </td>
+                <td><%= staff.approved_at&.strftime('%d %b %Y %H:%M') || '-' %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="no-data">Belum ada pendaftaran yang disetujui.</p>
+    <% end %>
+  </div>
+
+  <!-- Rejected Registrations -->
+  <% if @rejected_registrations.any? %>
+    <div class="section-card">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="badge badge-danger"><%= @rejected_registrations.count %></span>
+          Pendaftaran Ditolak (10 Terakhir)
+        </h2>
+      </div>
+
+      <div class="registrations-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Posisi</th>
+              <th>Alasan</th>
+              <th>Ditolak Oleh</th>
+              <th>Tanggal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @rejected_registrations.each do |staff| %>
+              <tr>
+                <td>
+                  <strong><%= staff.name %></strong><br>
+                  <small><%= staff.user.email %></small>
+                </td>
+                <td>
+                  <% if staff.role == 'doctor' %>
+                    <span class="badge badge-primary">Dokter</span>
+                  <% else %>
+                    <span class="badge badge-info">Perawat</span>
+                  <% end %>
+                </td>
+                <td>-</td>
+                <td>
+                  <% if staff.approved_by %>
+                    <%= User.find_by(id: staff.approved_by)&.name || 'Admin' %>
+                  <% else %>
+                    -
+                  <% end %>
+                </td>
+                <td><%= staff.approved_at&.strftime('%d %b %Y %H:%M') || '-' %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<style>
+.section-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-header {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ecf0f1;
+}
+
+.section-title {
+  font-size: 18px;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  min-width: 30px;
+}
+
+.badge-warning {
+  background: #f39c12;
+  color: white;
+}
+
+.badge-success {
+  background: #27ae60;
+  color: white;
+}
+
+.badge-danger {
+  background: #e74c3c;
+  color: white;
+}
+
+.badge-primary {
+  background: #3498db;
+  color: white;
+}
+
+.badge-info {
+  background: #1abc9c;
+  color: white;
+}
+
+.registrations-table {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  background: #f8f9fa;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #2c3e50;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.data-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-success {
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background: #229954;
+}
+
+.btn-danger {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #c0392b;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+  font-style: italic;
+}
+</style>

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EKG Viewer - Doctor Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      color: #111827;
+      margin-bottom: 10px;
+    }
+    
+    .patient-info {
+      display: flex;
+      gap: 30px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    #ekgChart {
+      height: 500px;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .controls button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    
+    .controls button:hover {
+      background: #2563eb;
+    }
+    
+    .controls button:disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+    }
+    
+    .page-info {
+      color: #374151;
+      font-size: 14px;
+    }
+    
+    .marker-tool {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .marker-tool h3 {
+      margin-bottom: 15px;
+      color: #111827;
+    }
+    
+    .marker-form {
+      display: grid;
+      gap: 15px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .form-group label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    
+    .btn-primary {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .markers-list {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .markers-list h3 {
+      margin-bottom: 15px;
+      color: #111827;
+    }
+    
+    .marker-item {
+      border-left: 4px solid #10b981;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #f9fafb;
+      border-radius: 4px;
+    }
+    
+    .marker-item.severity-low { border-left-color: #10b981; }
+    .marker-item.severity-medium { border-left-color: #f59e0b; }
+    .marker-item.severity-high { border-left-color: #f97316; }
+    .marker-item.severity-critical { border-left-color: #ef4444; }
+    
+    .marker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .marker-label {
+      font-weight: 600;
+      color: #111827;
+    }
+    
+    .marker-type {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e5e7eb;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #374151;
+    }
+    
+    .marker-details {
+      font-size: 13px;
+      color: #6b7280;
+    }
+    
+    .marker-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .marker-actions button {
+      padding: 4px 12px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .btn-edit {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .btn-delete {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .selection-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .selection-overlay.active {
+      display: flex;
+    }
+    
+    .selection-info {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      max-width: 500px;
+      width: 90%;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #6b7280;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .stat-label {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 5px;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #111827;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>📊 EKG Viewer</h1>
+      <div class="patient-info">
+        <span><strong>Patient:</strong> <span id="patientName">Loading...</span></span>
+        <span><strong>Recording ID:</strong> <span id="recordingId">-</span></span>
+        <span><strong>Duration:</strong> <span id="duration">-</span></span>
+        <span><strong>Sample Rate:</strong> <span id="sampleRate">-</span> Hz</span>
+      </div>
+    </div>
+    
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Samples</div>
+        <div class="stat-value" id="totalSamples">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Markers</div>
+        <div class="stat-value" id="totalMarkers">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Critical Markers</div>
+        <div class="stat-value" id="criticalMarkers" style="color: #ef4444;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Current Page</div>
+        <div class="stat-value" id="currentPageStat">1</div>
+      </div>
+    </div>
+    
+    <!-- Chart -->
+    <div class="chart-container">
+      <canvas id="ekgChart"></canvas>
+    </div>
+    
+    <!-- Controls -->
+    <div class="controls">
+      <button id="prevBtn" onclick="loadPreviousPage()">← Previous 10 min</button>
+      <div class="page-info">
+        <span id="pageInfo">Page 1 of 1</span>
+      </div>
+      <button id="nextBtn" onclick="loadNextPage()">Next 10 min →</button>
+    </div>
+    
+    <!-- Marker Tool -->
+    <div class="marker-tool">
+      <h3>🎯 Add Marker</h3>
+      <div id="selectionMessage" style="padding: 10px; background: #dbeafe; border-radius: 6px; margin-bottom: 15px; display: none;">
+        Click on the chart twice to select a region for marking.
+      </div>
+      <form class="marker-form" id="markerForm" onsubmit="submitMarker(event)">
+        <div class="form-group">
+          <label>Marker Type</label>
+          <select name="marker_type" required>
+            <option value="normal">Normal</option>
+            <option value="arrhythmia">Arrhythmia</option>
+            <option value="artifact">Artifact</option>
+            <option value="annotation">Annotation</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Label</label>
+          <input type="text" name="label" placeholder="e.g., P wave, QRS complex, Ventricular Tachycardia" required />
+        </div>
+        
+        <div class="form-group">
+          <label>Severity</label>
+          <select name="severity" required>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" placeholder="Detailed description of the finding..."></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cancelMarkerSelection()">Cancel</button>
+          <button type="submit" class="btn-primary">Add Marker</button>
+        </div>
+      </form>
+    </div>
+    
+    <!-- Markers List -->
+    <div class="markers-list">
+      <h3>📌 Markers & Annotations</h3>
+      <div id="markersList">
+        <div class="loading">No markers yet. Click on the chart to add markers.</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Selection Overlay -->
+  <div class="selection-overlay" id="selectionOverlay">
+    <div class="selection-info">
+      <h3 style="margin-bottom: 15px;">Selection Active</h3>
+      <p style="color: #6b7280; margin-bottom: 20px;">
+        You've selected: <strong id="selectionRange">-</strong><br>
+        Duration: <strong id="selectionDuration">-</strong><br>
+        Samples: <strong id="selectionSamples">-</strong>
+      </p>
+      <button class="btn-primary" onclick="confirmSelection()">Continue to Add Marker</button>
+    </div>
+  </div>
+  
+  <script>
+    // Global variables
+    const BASE_URL = 'http://localhost:3000/api';
+    const RECORDING_ID = 1; // Change this based on actual recording
+    let currentPage = 1;
+    let totalPages = 1;
+    let ekgChart = null;
+    let ekgData = null;
+    let markers = [];
+    let selectionStart = null;
+    let selectionEnd = null;
+    let selectionAnnotation = null;
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('recordingId').textContent = RECORDING_ID;
+      loadEKGData(RECORDING_ID, 1);
+      loadMarkers(RECORDING_ID);
+      showSelectionMessage();
+    });
+    
+    function showSelectionMessage() {
+      document.getElementById('selectionMessage').style.display = 'block';
+    }
+    
+    // Load EKG data
+    async function loadEKGData(recordingId, page) {
+      try {
+        const response = await fetch(`${BASE_URL}/recordings/${recordingId}/batches?page=${page}&per_page=60`);
+        const { data } = await response.json();
+        
+        ekgData = processEKGData(data);
+        updateHeader(data);
+        renderChart(ekgData);
+        updatePagination(data);
+        
+      } catch (error) {
+        console.error('Error loading EKG data:', error);
+        alert('Failed to load EKG data');
+      }
+    }
+    
+    // Process EKG data
+    function processEKGData(data) {
+      const timestamps = [];
+      const values = [];
+      
+      data.batches.forEach(batch => {
+        const startTime = new Date(batch.start_timestamp).getTime();
+        const sampleInterval = 1000 / batch.sample_rate; // milliseconds
+        
+        batch.samples.forEach((value, index) => {
+          const timestamp = startTime + (index * sampleInterval);
+          timestamps.push(timestamp);
+          values.push(value);
+        });
+      });
+      
+      return {
+        timestamps,
+        values,
+        sampleRate: data.sample_rate,
+        totalBatches: data.total_batches,
+        currentPage: data.page,
+        totalPages: data.total_pages
+      };
+    }
+    
+    // Update header info
+    function updateHeader(data) {
+      document.getElementById('sampleRate').textContent = data.sample_rate;
+      document.getElementById('totalSamples').textContent = data.total_samples.toLocaleString();
+      document.getElementById('currentPageStat').textContent = data.page;
+      
+      const durationMin = (data.total_samples / data.sample_rate / 60).toFixed(1);
+      document.getElementById('duration').textContent = `${durationMin} min`;
+    }
+    
+    // Render chart
+    function renderChart(ekgData) {
+      const ctx = document.getElementById('ekgChart').getContext('2d');
+      
+      if (ekgChart) {
+        ekgChart.destroy();
+      }
+      
+      ekgChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ekgData.timestamps,
+          datasets: [{
+            label: 'EKG Signal',
+            data: ekgData.values,
+            borderColor: '#10b981',
+            borderWidth: 1,
+            pointRadius: 0,
+            tension: 0,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: handleChartClick,
+          scales: {
+            x: {
+              type: 'time',
+              time: {
+                unit: 'second',
+                displayFormats: {
+                  second: 'HH:mm:ss'
+                }
+              },
+              title: {
+                display: true,
+                text: 'Time'
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Amplitude (ADC units)'
+              }
+            }
+          },
+          plugins: {
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'x'
+              },
+              zoom: {
+                wheel: {
+                  enabled: true
+                },
+                pinch: {
+                  enabled: true
+                },
+                mode: 'x'
+              }
+            },
+            annotation: {
+              annotations: {}
+            }
+          }
+        }
+      });
+      
+      // Add existing markers to chart
+      addMarkersToChart();
+    }
+    
+    // Handle chart click for selection
+    function handleChartClick(event, elements) {
+      if (elements.length > 0) {
+        const index = elements[0].index;
+        
+        if (selectionStart === null) {
+          selectionStart = index;
+          highlightSelection(selectionStart, selectionStart);
+        } else if (selectionEnd === null) {
+          selectionEnd = index;
+          
+          // Ensure start is before end
+          if (selectionEnd < selectionStart) {
+            [selectionStart, selectionEnd] = [selectionEnd, selectionStart];
+          }
+          
+          highlightSelection(selectionStart, selectionEnd);
+          showSelectionInfo();
+        }
+      }
+    }
+    
+    // Highlight selection
+    function highlightSelection(start, end) {
+      if (!ekgChart) return;
+      
+      const startTime = ekgData.timestamps[start];
+      const endTime = ekgData.timestamps[end];
+      const minValue = Math.min(...ekgData.values.slice(start, end + 1));
+      const maxValue = Math.max(...ekgData.values.slice(start, end + 1));
+      
+      if (selectionAnnotation) {
+        delete ekgChart.options.plugins.annotation.annotations[selectionAnnotation];
+      }
+      
+      selectionAnnotation = 'selection';
+      
+      ekgChart.options.plugins.annotation.annotations[selectionAnnotation] = {
+        type: 'box',
+        xMin: startTime,
+        xMax: endTime,
+        yMin: minValue - 50,
+        yMax: maxValue + 50,
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 2
+      };
+      
+      ekgChart.update();
+    }
+    
+    // Show selection info
+    function showSelectionInfo() {
+      const startTime = new Date(ekgData.timestamps[selectionStart]);
+      const endTime = new Date(ekgData.timestamps[selectionEnd]);
+      const duration = ((ekgData.timestamps[selectionEnd] - ekgData.timestamps[selectionStart]) / 1000).toFixed(2);
+      const sampleCount = selectionEnd - selectionStart + 1;
+      
+      document.getElementById('selectionRange').textContent = 
+        `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`;
+      document.getElementById('selectionDuration').textContent = `${duration}s`;
+      document.getElementById('selectionSamples').textContent = sampleCount;
+      
+      document.getElementById('selectionOverlay').classList.add('active');
+    }
+    
+    // Confirm selection
+    function confirmSelection() {
+      document.getElementById('selectionOverlay').classList.remove('active');
+      document.getElementById('markerForm').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Cancel marker selection
+    function cancelMarkerSelection() {
+      selectionStart = null;
+      selectionEnd = null;
+      
+      if (selectionAnnotation && ekgChart) {
+        delete ekgChart.options.plugins.annotation.annotations[selectionAnnotation];
+        ekgChart.update();
+      }
+      
+      document.getElementById('markerForm').reset();
+    }
+    
+    // Submit marker
+    async function submitMarker(event) {
+      event.preventDefault();
+      
+      if (selectionStart === null || selectionEnd === null) {
+        alert('Please select a region on the chart first');
+        return;
+      }
+      
+      const formData = new FormData(event.target);
+      const batchSequence = Math.floor(selectionStart / 5000) + ((currentPage - 1) * 60);
+      const sampleIndexStart = selectionStart % 5000;
+      const sampleIndexEnd = selectionEnd % 5000;
+      
+      const markerData = {
+        recording_id: RECORDING_ID,
+        marker: {
+          marker_type: formData.get('marker_type'),
+          batch_sequence: batchSequence,
+          sample_index_start: sampleIndexStart,
+          sample_index_end: sampleIndexEnd,
+          timestamp_start: new Date(ekgData.timestamps[selectionStart]).toISOString(),
+          timestamp_end: new Date(ekgData.timestamps[selectionEnd]).toISOString(),
+          label: formData.get('label'),
+          description: formData.get('description'),
+          severity: formData.get('severity')
+        }
+      };
+      
+      try {
+        const response = await fetch(`${BASE_URL}/recordings/${RECORDING_ID}/markers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(markerData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('Marker added successfully!');
+          cancelMarkerSelection();
+          loadMarkers(RECORDING_ID);
+        } else {
+          alert('Failed to add marker: ' + result.message);
+        }
+      } catch (error) {
+        console.error('Error adding marker:', error);
+        alert('Failed to add marker');
+      }
+    }
+    
+    // Load markers
+    async function loadMarkers(recordingId) {
+      try {
+        const response = await fetch(`${BASE_URL}/recordings/${recordingId}/markers`);
+        const { data } = await response.json();
+        
+        markers = data.markers;
+        document.getElementById('totalMarkers').textContent = data.total_markers;
+        
+        const criticalCount = markers.filter(m => m.severity === 'critical').length;
+        document.getElementById('criticalMarkers').textContent = criticalCount;
+        
+        renderMarkersList(markers);
+        addMarkersToChart();
+        
+      } catch (error) {
+        console.error('Error loading markers:', error);
+      }
+    }
+    
+    // Render markers list
+    function renderMarkersList(markers) {
+      const container = document.getElementById('markersList');
+      
+      if (markers.length === 0) {
+        container.innerHTML = '<div class="loading">No markers yet.</div>';
+        return;
+      }
+      
+      container.innerHTML = markers.map(marker => `
+        <div class="marker-item severity-${marker.severity}">
+          <div class="marker-header">
+            <span class="marker-label">${marker.label || 'Unlabeled'}</span>
+            <span class="marker-type">${marker.marker_type}</span>
+          </div>
+          <div class="marker-details">
+            <strong>Time:</strong> ${new Date(marker.timestamp_start).toLocaleTimeString()} - ${new Date(marker.timestamp_end).toLocaleTimeString()}<br>
+            <strong>Duration:</strong> ${marker.duration_ms}ms | 
+            <strong>Samples:</strong> ${marker.sample_count} |
+            <strong>Severity:</strong> ${marker.severity}<br>
+            ${marker.description ? `<strong>Note:</strong> ${marker.description}<br>` : ''}
+            <strong>By:</strong> ${marker.created_by.name}
+          </div>
+          <div class="marker-actions">
+            <button class="btn-delete" onclick="deleteMarker(${marker.id})">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // Add markers to chart
+    function addMarkersToChart() {
+      if (!ekgChart || !markers) return;
+      
+      markers.forEach(marker => {
+        const startIndex = (marker.batch_sequence - ((currentPage - 1) * 60)) * 5000 + marker.sample_index_start;
+        const endIndex = (marker.batch_sequence - ((currentPage - 1) * 60)) * 5000 + marker.sample_index_end;
+        
+        // Only add if marker is in current page
+        if (startIndex >= 0 && startIndex < ekgData.values.length) {
+          const startTime = ekgData.timestamps[startIndex];
+          const endTime = ekgData.timestamps[Math.min(endIndex, ekgData.values.length - 1)];
+          const minValue = Math.min(...ekgData.values.slice(startIndex, endIndex + 1));
+          const maxValue = Math.max(...ekgData.values.slice(startIndex, endIndex + 1));
+          
+          ekgChart.options.plugins.annotation.annotations[`marker_${marker.id}`] = {
+            type: 'box',
+            xMin: startTime,
+            xMax: endTime,
+            yMin: minValue - 30,
+            yMax: maxValue + 30,
+            backgroundColor: marker.color.replace(')', ', 0.2)').replace('rgb', 'rgba'),
+            borderColor: marker.color,
+            borderWidth: 2,
+            label: {
+              display: true,
+              content: marker.label,
+              position: 'start',
+              backgroundColor: marker.color,
+              color: 'white'
+            }
+          };
+        }
+      });
+      
+      ekgChart.update();
+    }
+    
+    // Delete marker
+    async function deleteMarker(markerId) {
+      if (!confirm('Are you sure you want to delete this marker?')) return;
+      
+      try {
+        const response = await fetch(`${BASE_URL}/markers/${markerId}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('Marker deleted successfully');
+          loadMarkers(RECORDING_ID);
+        }
+      } catch (error) {
+        console.error('Error deleting marker:', error);
+        alert('Failed to delete marker');
+      }
+    }
+    
+    // Update pagination
+    function updatePagination(data) {
+      currentPage = data.page;
+      totalPages = data.total_pages;
+      
+      document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+      document.getElementById('prevBtn').disabled = currentPage === 1;
+      document.getElementById('nextBtn').disabled = currentPage === totalPages;
+    }
+    
+    // Navigation
+    function loadPreviousPage() {
+      if (currentPage > 1) {
+        loadEKGData(RECORDING_ID, currentPage - 1);
+      }
+    }
+    
+    function loadNextPage() {
+      if (currentPage < totalPages) {
+        loadEKGData(RECORDING_ID, currentPage + 1);
+      }
+    }
+  </script>
+</body>
+</html>

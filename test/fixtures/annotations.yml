@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  recording: one
+  start_time: 2025-11-23 17:17:26
+  end_time: 2025-11-23 17:17:26
+  label: MyString
+  notes: MyText
+  created_by: one
+
+two:
+  recording: two
+  start_time: 2025-11-23 17:17:26
+  end_time: 2025-11-23 17:17:26
+  label: MyString
+  notes: MyText
+  created_by: two

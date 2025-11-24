@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+  <head>
+    <title>Medical Data Management System</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta charset="utf-8">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Tailwind Config -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              primary: {
+                50: '#eff6ff',
+                100: '#dbeafe',
+                200: '#bfdbfe',
+                300: '#93c5fd',
+                400: '#60a5fa',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+                800: '#1e40af',
+                900: '#1e3a8a',
+                950: '#172554',
+              },
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+              'slide-up': 'slideUp 0.5s ease-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+      }
+    </style>
+  </head>
+
+  <body class="h-full flex flex-col text-slate-900 antialiased selection:bg-primary-500 selection:text-white">
+    <% unless content_for?(:skip_navbar) %>
+      <nav class="glass fixed w-full z-50 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex justify-between h-16">
+            <div class="flex items-center">
+              <%= link_to root_path, class: "flex-shrink-0 flex items-center gap-2 group" do %>
+                <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg group-hover:shadow-primary-500/50 transition-all duration-300">
+                  M
+                </div>
+                <span class="font-bold text-xl tracking-tight text-slate-800 group-hover:text-primary-600 transition-colors">MedData</span>
+              <% end %>
+            </div>
+            
+            <div class="hidden md:flex md:items-center md:space-x-8">
+              <% if session[:user_id] %>
+                <% if current_user&.patient? %>
+                  <%= link_to "Dashboard", patient_dashboard_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <% elsif current_user&.nurse? %>
+                  <%= link_to "Dashboard", nurse_dashboard_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "QR Codes", qr_codes_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Pasien", patients_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <% elsif current_user&.doctor? %>
+                  <%= link_to "Dashboard", doctor_dashboard_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Rekaman", recordings_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Pasien", patients_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <% elsif current_user&.hospital_manager? %>
+                  <%= link_to "Dashboard", hospital_manager_dashboard_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Rumah Sakit", hospitals_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Tenaga Medis", medical_staff_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Pasien", patients_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <% elsif current_user&.superuser? %>
+                  <%= link_to "Dashboard", superuser_dashboard_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Rumah Sakit", hospitals_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Tenaga Medis", medical_staff_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Pasien", patients_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                  <%= link_to "Rekaman", recordings_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <% else %>
+                  <%= link_to "Dashboard", dashboard_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <% end %>
+                
+                <div class="pl-4 border-l border-slate-200">
+                  <%= button_to logout_path, method: :delete, class: "text-sm font-medium text-red-600 hover:text-red-700 transition-colors" do %>
+                    Logout
+                  <% end %>
+                </div>
+              <% else %>
+                <%= link_to "Masuk", login_path, class: "text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors" %>
+                <%= link_to "Daftar", register_path, class: "inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 shadow-sm hover:shadow-md transition-all duration-200" %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <!-- Spacer for fixed navbar -->
+      <div class="h-16"></div>
+    <% end %>
+
+    <% unless content_for?(:skip_container) %>
+      <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+    <% else %>
+      <main class="flex-grow animate-fade-in">
+    <% end %>
+    
+      <% if flash[:notice] %>
+        <div class="mb-6 rounded-lg bg-green-50 p-4 border border-green-200 shadow-sm animate-slide-up">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm font-medium text-green-800"><%= flash[:notice] %></p>
+            </div>
+          </div>
+        </div>
+      <% end %>
+      
+      <% if flash[:alert] %>
+        <div class="mb-6 rounded-lg bg-red-50 p-4 border border-red-200 shadow-sm animate-slide-up">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm font-medium text-red-800"><%= flash[:alert] %></p>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <%= yield %>
+      
+    <% unless content_for?(:skip_container) %>
+      </main>
+    <% else %>
+      </main>
+    <% end %>
+    
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+      <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <p class="text-center text-sm text-slate-500">
+          &copy; <%= Time.current.year %> Medical Data Management System. All rights reserved.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

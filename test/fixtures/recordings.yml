@@ -1,0 +1,31 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  patient: one
+  hospital: one
+  user: one
+  session_id: MyString
+  start_time: 2025-11-19 05:47:55
+  end_time: 2025-11-19 05:47:55
+  duration_seconds: 1
+  total_samples: 1
+  sample_rate: 9.99
+  status: MyString
+  csv_file_path: MyString
+  notes: MyText
+  interpretation: MyText
+
+two:
+  patient: two
+  hospital: two
+  user: two
+  session_id: MyString
+  start_time: 2025-11-19 05:47:55
+  end_time: 2025-11-19 05:47:55
+  duration_seconds: 1
+  total_samples: 1
+  sample_rate: 9.99
+  status: MyString
+  csv_file_path: MyString
+  notes: MyText
+  interpretation: MyText

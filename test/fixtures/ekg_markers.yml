@@ -1,0 +1,29 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  recording: one
+  created_by: one
+  marker_type: MyString
+  batch_sequence: 1
+  sample_index_start: 1
+  sample_index_end: 1
+  timestamp_start: 2025-11-22 14:08:40
+  timestamp_end: 2025-11-22 14:08:40
+  label: MyString
+  description: MyText
+  severity: MyString
+  metadata: 
+
+two:
+  recording: two
+  created_by: two
+  marker_type: MyString
+  batch_sequence: 1
+  sample_index_start: 1
+  sample_index_end: 1
+  timestamp_start: 2025-11-22 14:08:40
+  timestamp_end: 2025-11-22 14:08:40
+  label: MyString
+  description: MyText
+  severity: MyString
+  metadata: 

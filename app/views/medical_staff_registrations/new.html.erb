@@ -1,0 +1,247 @@
+<div class="registration-container">
+  <div class="registration-header">
+    <h1>Pendaftaran Tenaga Medis</h1>
+    <p class="subtitle">Daftar sebagai Dokter atau Perawat</p>
+  </div>
+
+  <%= form_with model: @user, url: medical_staff_registrations_path, local: true, html: { class: 'registration-form' } do |f| %>
+    <% if @user.errors.any? || (@medical_staff && @medical_staff.errors.any?) %>
+      <div class="error-messages">
+        <h3>Terdapat kesalahan:</h3>
+        <ul>
+          <% @user.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+          <% if @medical_staff %>
+            <% @medical_staff.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="form-section">
+      <h2>Informasi Akun</h2>
+      
+      <div class="form-group">
+        <%= f.label :email, "Email" %>
+        <%= f.email_field :email, class: "form-control", required: true, placeholder: "email@example.com" %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :password, "Password" %>
+        <%= f.password_field :password, class: "form-control", required: true, minlength: 6 %>
+        <small class="form-text">Minimal 6 karakter</small>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :password_confirmation, "Konfirmasi Password" %>
+        <%= f.password_field :password_confirmation, class: "form-control", required: true %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :role, "Posisi" %>
+        <%= f.select :role, 
+            options_for_select([['Dokter', 'doctor'], ['Perawat', 'nurse']], @user.role), 
+            { prompt: "-- Pilih Posisi --" }, 
+            { class: "form-control", required: true } %>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Informasi Profesional</h2>
+
+      <%= fields_for :medical_staff, @medical_staff do |ms| %>
+        <div class="form-group">
+          <%= ms.label :name, "Nama Lengkap" %>
+          <%= ms.text_field :name, class: "form-control", required: true, placeholder: "Dr. John Doe" %>
+        </div>
+
+        <div class="form-group">
+          <%= ms.label :license_number, "Nomor Izin Praktik (SIP/STR)" %>
+          <%= ms.text_field :license_number, class: "form-control", required: true, placeholder: "SIP.123456789" %>
+          <small class="form-text">Nomor Surat Izin Praktik atau Surat Tanda Registrasi</small>
+        </div>
+
+        <div class="form-group">
+          <%= ms.label :specialization, "Spesialisasi" %>
+          <%= ms.text_field :specialization, class: "form-control", required: true, placeholder: "Kardiologi, Umum, dll" %>
+        </div>
+
+        <div class="form-group">
+          <%= ms.label :phone, "No. Telepon" %>
+          <%= ms.text_field :phone, class: "form-control", required: true, placeholder: "+62812345678" %>
+        </div>
+
+        <div class="form-group">
+          <%= ms.label :hospital_id, "Rumah Sakit" %>
+          <%= ms.select :hospital_id, 
+              options_for_select(@hospitals.map { |h| [h.name, h.id] }), 
+              { prompt: "-- Pilih Rumah Sakit --" }, 
+              { class: "form-control", required: true } %>
+        </div>
+
+        <%= ms.hidden_field :role, value: '' %>
+      <% end %>
+    </div>
+
+    <div class="form-actions">
+      <%= f.submit "Daftar", class: "btn btn-primary btn-lg" %>
+      <%= link_to "Kembali", root_path, class: "btn btn-secondary" %>
+    </div>
+
+    <div class="form-note">
+      <p><strong>Catatan:</strong> Pendaftaran Anda akan direview oleh Hospital Manager. 
+      Anda akan menerima notifikasi setelah pendaftaran disetujui.</p>
+    </div>
+  <% end %>
+</div>
+
+<style>
+.registration-container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.registration-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.registration-header h1 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #7f8c8d;
+}
+
+.form-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.form-section h2 {
+  font-size: 18px;
+  color: #34495e;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form-text {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+  flex: 1;
+}
+
+.btn-primary:hover {
+  background: #2980b9;
+}
+
+.btn-secondary {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #7f8c8d;
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 18px;
+}
+
+.error-messages {
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.error-messages h3 {
+  color: #c00;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.error-messages ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.error-messages li {
+  color: #c00;
+  margin-bottom: 5px;
+}
+
+.form-note {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-left: 4px solid #3498db;
+  border-radius: 4px;
+}
+
+.form-note p {
+  margin: 0;
+  color: #555;
+  font-size: 14px;
+}
+</style>

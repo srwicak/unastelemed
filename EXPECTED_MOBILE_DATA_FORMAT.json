@@ -1,0 +1,395 @@
+{
+  "_comment": "==================== EXPECTED DATA FORMAT FROM MOBILE APP ====================",
+  "_description": "Format data yang diharapkan dari aplikasi mobile pasien untuk sistem EKG",
+  "_version": "1.0",
+  "_last_updated": "2025-11-22",
+
+  "1_start_recording": {
+    "_endpoint": "POST /api/recordings/start",
+    "_description": "Memulai sesi recording baru",
+    "_when": "Setelah scan QR code dan validasi berhasil",
+    
+    "request": {
+      "qr_code": "{\"session_id\":\"702664379c264e04\",\"patient_identifier\":\"f2wkYtlhVFGF\",\"timestamp\":\"2025-11-22T02:13:51Z\",\"expiry\":\"2025-11-23T02:13:51Z\",\"device_type\":\"CardioGuardian\",\"validation_code\":\"60d338770c1c4cb677404b8063dd9234\",\"max_duration_seconds\":3600,\"code\":\"QR_CODE_STRING\"}",
+      "session_id": "702664379c264e04",
+      "device_id": "CG-12345",
+      "device_name": "CardioGuardian #1",
+      "sample_rate": 500.0
+    },
+    
+    "response_success": {
+      "success": true,
+      "message": "Recording dimulai",
+      "data": {
+        "recording_id": 1,
+        "session_id": "702664379c264e04",
+        "patient": {
+          "id": 5,
+          "name": "John Doe",
+          "patient_identifier": "f2wkYtlhVFGF"
+        },
+        "max_duration_seconds": 3600,
+        "sample_rate": 500.0,
+        "started_at": "2025-11-22T10:30:00.000Z"
+      }
+    }
+  },
+
+  "2_send_batch_data": {
+    "_endpoint": "POST /api/recordings/data",
+    "_description": "Kirim data sensor dalam format batch (RECOMMENDED)",
+    "_frequency": "Setiap 10 detik",
+    "_samples_per_batch": 5000,
+    "_calculation": "500 Hz × 10 seconds = 5000 samples",
+    
+    "request": {
+      "recording_id": 1,
+      "batch_data": {
+        "batch_sequence": 0,
+        "start_timestamp": "2025-11-22T10:30:00.000Z",
+        "end_timestamp": "2025-11-22T10:30:10.000Z",
+        "sample_rate": 500.0,
+        "samples": [
+          512, 515, 518, 520, 523, 525, 528, 530, 533, 535,
+          538, 540, 543, 545, 548, 550, 553, 555, 558, 560,
+          "_comment: ... 4980 more values ...",
+          562, 565, 567, 570, 572, 575, 577, 580, 582, 585
+        ]
+      }
+    },
+    
+    "request_notes": {
+      "recording_id": "Integer - ID dari response start recording",
+      "batch_sequence": "Integer - Urutan batch mulai dari 0, increment setiap kirim",
+      "start_timestamp": "ISO 8601 String - Waktu sample pertama di batch ini",
+      "end_timestamp": "ISO 8601 String - Waktu sample terakhir di batch ini",
+      "sample_rate": "Float - Sampling rate dalam Hz (biasanya 500.0)",
+      "samples": "Array[Float] - Array 5000 nilai dalam microvolts (µV), bisa positif/negatif"
+    },
+    
+    "timing_example": {
+      "batch_0": "10:30:00 - 10:30:10 (samples 0-4999)",
+      "batch_1": "10:30:10 - 10:30:20 (samples 5000-9999)",
+      "batch_2": "10:30:20 - 10:30:30 (samples 10000-14999)",
+      "batch_3": "10:30:30 - 10:30:40 (samples 15000-19999)",
+      "_note": "Continue setiap 10 detik sampai recording selesai"
+    },
+    
+    "response_success": {
+      "success": true,
+      "message": "Batch data berhasil disimpan",
+      "data": {
+        "recording_id": 1,
+        "batch_sequence": 0,
+        "samples_received": 5000,
+        "total_batches": 1,
+        "total_samples": 5000
+      }
+    },
+    
+    "response_error_400": {
+      "success": false,
+      "error": "Terlalu banyak samples, max 10,000 per request (received: 15000)"
+    },
+    
+    "response_error_422": {
+      "success": false,
+      "error": "Recording tidak dalam status recording",
+      "current_status": "completed"
+    }
+  },
+
+  "3_stop_recording": {
+    "_endpoint": "POST /api/recordings/:id/stop",
+    "_description": "Menghentikan sesi recording",
+    "_when": "Ketika user klik stop atau max duration tercapai",
+    
+    "request": {
+      "_method": "POST",
+      "_url": "/api/recordings/1/stop",
+      "_body": "Empty body or {}",
+      "_note": "ID recording dari response start"
+    },
+    
+    "response_success": {
+      "success": true,
+      "message": "Recording selesai",
+      "data": {
+        "recording_id": 1,
+        "session_id": "702664379c264e04",
+        "status": "completed",
+        "started_at": "2025-11-22T10:30:00.000Z",
+        "ended_at": "2025-11-22T11:30:00.000Z",
+        "duration_seconds": 3600,
+        "total_samples": 1800000
+      }
+    }
+  },
+
+  "4_complete_flow_example": {
+    "_description": "Contoh lengkap flow recording 1 jam",
+    
+    "step_1_start": {
+      "time": "10:30:00",
+      "action": "POST /api/recordings/start",
+      "result": "recording_id = 1"
+    },
+    
+    "step_2_batch_0": {
+      "time": "10:30:10",
+      "action": "POST /api/recordings/data",
+      "batch_sequence": 0,
+      "samples_count": 5000,
+      "time_range": "10:30:00 - 10:30:10"
+    },
+    
+    "step_3_batch_1": {
+      "time": "10:30:20",
+      "action": "POST /api/recordings/data",
+      "batch_sequence": 1,
+      "samples_count": 5000,
+      "time_range": "10:30:10 - 10:30:20"
+    },
+    
+    "step_4_continue": {
+      "note": "Continue sending batch every 10 seconds...",
+      "total_batches_1_hour": 360,
+      "calculation": "3600 seconds / 10 seconds = 360 batches"
+    },
+    
+    "step_5_batch_359": {
+      "time": "11:29:50",
+      "action": "POST /api/recordings/data",
+      "batch_sequence": 359,
+      "samples_count": 5000,
+      "time_range": "11:29:50 - 11:30:00"
+    },
+    
+    "step_6_stop": {
+      "time": "11:30:00",
+      "action": "POST /api/recordings/1/stop",
+      "result": "status = completed, total_samples = 1,800,000"
+    }
+  },
+
+  "5_data_validation": {
+    "_description": "Validasi data yang perlu dilakukan di mobile app",
+    
+    "sample_values": {
+      "type": "Float",
+      "unit": "microvolts (µV)",
+      "range": "Typically -5000 to +5000 µV for ECG",
+      "reason": "Raw biopotential signal in microvolts",
+      "invalid_example": ["string", null, "NaN"]
+    },
+    
+    "sample_count": {
+      "expected": 5000,
+      "calculation": "sample_rate × duration (500 Hz × 10 seconds)",
+      "tolerance": "±10 samples acceptable",
+      "critical": "Must not exceed 10,000 per batch"
+    },
+    
+    "batch_sequence": {
+      "start": 0,
+      "increment": 1,
+      "example": "0, 1, 2, 3, 4, ..., 359",
+      "note": "Must be sequential, no gaps"
+    },
+    
+    "timestamps": {
+      "format": "ISO 8601",
+      "timezone": "UTC (Z suffix)",
+      "example": "2025-11-22T10:30:00.000Z",
+      "precision": "Milliseconds recommended",
+      "validation": "end_timestamp must be > start_timestamp"
+    },
+    
+    "sample_rate": {
+      "standard": 500.0,
+      "type": "Float",
+      "unit": "Hz (samples per second)",
+      "alternatives": [250.0, 500.0, 1000.0],
+      "note": "Must be consistent throughout recording"
+    }
+  },
+
+  "6_error_handling": {
+    "_description": "Cara handle error di mobile app",
+    
+    "network_failure": {
+      "scenario": "Request timeout atau no internet",
+      "action": "Store batch locally, retry with exponential backoff",
+      "max_retries": 3,
+      "retry_delays": [1, 2, 4]
+    },
+    
+    "server_error_500": {
+      "scenario": "Server internal error",
+      "action": "Retry after 5 seconds, max 3 attempts",
+      "user_message": "Server error, retrying..."
+    },
+    
+    "validation_error_422": {
+      "scenario": "Invalid data format",
+      "action": "Log error, notify user, stop recording",
+      "user_message": "Data error, please restart recording"
+    },
+    
+    "recording_not_found_404": {
+      "scenario": "Recording ID invalid",
+      "action": "Restart recording process from QR scan",
+      "user_message": "Session expired, please scan QR again"
+    }
+  },
+
+  "7_performance_tips": {
+    "_description": "Tips untuk optimasi performa di mobile app",
+    
+    "buffer_management": {
+      "tip": "Use circular buffer untuk collect samples",
+      "size": "Allocate buffer untuk 5000+ samples",
+      "implementation": "Pre-allocate array, avoid resize"
+    },
+    
+    "network_optimization": {
+      "tip": "Compress JSON payload sebelum kirim",
+      "method": "gzip compression",
+      "expected_size": "~10-15 KB per batch (compressed)",
+      "raw_size": "~20-25 KB per batch (uncompressed)"
+    },
+    
+    "battery_optimization": {
+      "tip": "Batch network requests, avoid individual sends",
+      "wifi_preferred": "Prefer WiFi over cellular",
+      "background_mode": "Request background execution permission"
+    },
+    
+    "memory_management": {
+      "tip": "Clear buffer after successful send",
+      "avoid": "Don't accumulate multiple batches in memory",
+      "max_memory": "Keep < 50 MB memory footprint"
+    }
+  },
+
+  "8_mobile_app_pseudocode": {
+    "_description": "Contoh implementasi di mobile app (pseudocode)",
+    
+    "initialization": [
+      "scanQRCode() -> qrData",
+      "validateQR(qrData) -> sessionValid",
+      "if sessionValid:",
+      "  startRecording(qrData) -> recordingId",
+      "  initializeSensorBuffer(size: 5000)",
+      "  startTimer(interval: 10 seconds)"
+    ],
+    
+    "data_collection": [
+      "onSensorData(value):",
+      "  buffer.append(value)",
+      "  if buffer.length >= 5000:",
+      "    sendBatch(buffer)",
+      "    buffer.clear()"
+    ],
+    
+    "send_batch": [
+      "sendBatch(samples):",
+      "  batchData = {",
+      "    batch_sequence: currentBatchNumber,",
+      "    start_timestamp: batchStartTime.toISOString(),",
+      "    end_timestamp: getCurrentTime().toISOString(),",
+      "    sample_rate: 500.0,",
+      "    samples: samples",
+      "  }",
+      "  ",
+      "  response = POST('/api/recordings/data', {",
+      "    recording_id: recordingId,",
+      "    batch_data: batchData",
+      "  })",
+      "  ",
+      "  if response.success:",
+      "    currentBatchNumber++",
+      "    batchStartTime = getCurrentTime()",
+      "  else:",
+      "    retryBatch(batchData)"
+    ],
+    
+    "stop_recording": [
+      "stopRecording():",
+      "  stopSensor()",
+      "  stopTimer()",
+      "  if buffer.length > 0:",
+      "    sendBatch(buffer)  // Send remaining samples",
+      "  POST('/api/recordings/' + recordingId + '/stop')",
+      "  cleanup()"
+    ]
+  },
+
+  "9_testing_data": {
+    "_description": "Sample data untuk testing",
+    
+    "minimal_test": {
+      "description": "Test dengan 1 batch saja (10 detik)",
+      "recording_id": 1,
+      "batch_data": {
+        "batch_sequence": 0,
+        "start_timestamp": "2025-11-22T10:00:00.000Z",
+        "end_timestamp": "2025-11-22T10:00:10.000Z",
+        "sample_rate": 500.0,
+        "samples": "[Generate 5000 random integers between 400-600]"
+      }
+    },
+    
+    "simulated_ekg": {
+      "description": "Simulate normal EKG pattern",
+      "baseline": 512,
+      "p_wave": "512 -> 530 -> 512 (50ms)",
+      "qrs_complex": "512 -> 400 -> 700 -> 512 (100ms)",
+      "t_wave": "512 -> 550 -> 512 (200ms)",
+      "pattern_duration": "~800ms (0.8 seconds)",
+      "heartrate": "75 bpm"
+    },
+    
+    "curl_example": [
+      "curl -X POST http://localhost:3000/api/recordings/data \\",
+      "  -H 'Content-Type: application/json' \\",
+      "  -d '{",
+      "    \"recording_id\": 1,",
+      "    \"batch_data\": {",
+      "      \"batch_sequence\": 0,",
+      "      \"start_timestamp\": \"2025-11-22T10:00:00.000Z\",",
+      "      \"end_timestamp\": \"2025-11-22T10:00:10.000Z\",",
+      "      \"sample_rate\": 500.0,",
+      "      \"samples\": [512, 515, 518, ...]",
+      "    }",
+      "  }'"
+    ]
+  },
+
+  "10_summary": {
+    "key_points": [
+      "✅ Kirim data setiap 10 detik (bukan per 1 detik lagi)",
+      "✅ Setiap batch = 5000 samples (500 Hz × 10 seconds)",
+      "✅ Format: JSON dengan array integer (ADC values 0-4095)",
+      "✅ Batch sequence mulai dari 0, increment tiap kirim",
+      "✅ Timestamps dalam ISO 8601 UTC format",
+      "✅ Handle error dengan retry mechanism",
+      "✅ Compress data untuk save bandwidth",
+      "✅ Stop recording = kirim sisa samples + call stop endpoint"
+    ],
+    
+    "endpoints_summary": [
+      "POST /api/recordings/start → Get recording_id",
+      "POST /api/recordings/data → Send batch (every 10s)",
+      "POST /api/recordings/:id/stop → Complete recording"
+    ],
+    
+    "data_size_estimate": {
+      "1_batch_10_seconds": "~20 KB (5000 samples)",
+      "1_minute_6_batches": "~120 KB",
+      "10_minutes_60_batches": "~1.2 MB",
+      "1_hour_360_batches": "~7.2 MB",
+      "with_compression": "~3-4 MB per hour"
+    }
+  }
+}

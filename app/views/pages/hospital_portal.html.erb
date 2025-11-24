@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Rumah Sakit - Holter EKG System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-50">
+  
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-5xl w-full">
+      
+      <!-- Back Button -->
+      <%= link_to root_path, class: "inline-flex items-center text-blue-600 hover:text-blue-700 mb-8 font-medium transition" do %>
+        <i class="fas fa-arrow-left mr-2"></i>
+        Kembali ke Beranda
+      <% end %>
+
+      <!-- Header -->
+      <div class="text-center mb-12">
+        <i class="fas fa-hospital text-6xl text-blue-600 mb-4"></i>
+        <h1 class="text-4xl font-bold text-gray-900 mb-3">Portal Rumah Sakit</h1>
+        <p class="text-xl text-gray-600">Sistem manajemen untuk tenaga medis dan administrasi</p>
+      </div>
+
+      <!-- Hierarchy Info -->
+      <div class="bg-white rounded-2xl shadow-2xl p-8 mb-8">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Hierarki Pengguna Sistem</h2>
+        
+        <div class="space-y-4">
+          <!-- Superuser -->
+          <div class="flex items-center p-4 border-2 border-purple-200 rounded-lg bg-purple-50">
+            <div class="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white mr-4">
+              <i class="fas fa-crown text-xl"></i>
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-gray-900">Superuser / Super Admin</h3>
+              <p class="text-sm text-gray-600">Akses penuh ke seluruh sistem, mengelola semua rumah sakit</p>
+            </div>
+          </div>
+
+          <div class="flex justify-center">
+            <i class="fas fa-arrow-down text-gray-400 text-2xl"></i>
+          </div>
+
+          <!-- Hospital Manager -->
+          <div class="flex items-center p-4 border-2 border-orange-200 rounded-lg bg-orange-50">
+            <div class="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center text-white mr-4">
+              <i class="fas fa-hospital-user text-xl"></i>
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-gray-900">Hospital Manager</h3>
+              <p class="text-sm text-gray-600">Mengelola rumah sakit, mendaftarkan dokter & perawat</p>
+            </div>
+          </div>
+
+          <div class="flex justify-center">
+            <i class="fas fa-arrow-down text-gray-400 text-2xl"></i>
+          </div>
+
+          <!-- Doctor & Nurse -->
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="flex items-center p-4 border-2 border-purple-200 rounded-lg bg-purple-50">
+              <div class="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white mr-4">
+                <i class="fas fa-user-md text-xl"></i>
+              </div>
+              <div class="flex-1">
+                <h3 class="font-bold text-gray-900">Dokter</h3>
+                <p class="text-sm text-gray-600">Interpretasi EKG & diagnosis</p>
+              </div>
+            </div>
+
+            <div class="flex items-center p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+              <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white mr-4">
+                <i class="fas fa-user-nurse text-xl"></i>
+              </div>
+              <div class="flex-1">
+                <h3 class="font-bold text-gray-900">Perawat</h3>
+                <p class="text-sm text-gray-600">Pemasangan holter & monitoring</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Login Card -->
+      <div class="bg-white rounded-2xl shadow-2xl p-8">
+        <div class="text-center mb-8">
+          <div class="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-user-tie text-3xl text-white"></i>
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-2">Login Staff Rumah Sakit</h2>
+          <p class="text-gray-600">Untuk Hospital Manager, Dokter, dan Perawat</p>
+        </div>
+
+        <!-- Alerts -->
+        <% if flash[:alert] %>
+          <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <div class="flex items-center">
+              <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+              <p class="text-red-700"><%= flash[:alert] %></p>
+            </div>
+          </div>
+        <% end %>
+
+        <% if flash[:notice] %>
+          <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded">
+            <div class="flex items-center">
+              <i class="fas fa-check-circle text-green-500 mr-3"></i>
+              <p class="text-green-700"><%= flash[:notice] %></p>
+            </div>
+          </div>
+        <% end %>
+
+        <!-- Login Form -->
+        <%= form_with url: hospital_login_path, method: :post, local: true, class: "space-y-6" do |f| %>
+          
+          <!-- Email Field -->
+          <div>
+            <%= label_tag :email, "Email", class: "block text-sm font-medium text-gray-700 mb-2" %>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-envelope text-gray-400"></i>
+              </div>
+              <%= email_field_tag :email, params[:email], 
+                class: "block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition",
+                placeholder: "email@rumahsakit.com",
+                required: true,
+                autofocus: true
+              %>
+            </div>
+          </div>
+
+          <!-- Password Field -->
+          <div>
+            <%= label_tag :password, "Password", class: "block text-sm font-medium text-gray-700 mb-2" %>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-lock text-gray-400"></i>
+              </div>
+              <%= password_field_tag :password, nil,
+                class: "block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition",
+                placeholder: "Masukkan password",
+                required: true,
+                id: "password-field"
+              %>
+              <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <i class="fas fa-eye text-gray-400 hover:text-gray-600" id="toggle-icon"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Remember Me -->
+          <div class="flex items-center justify-between">
+            <label class="flex items-center">
+              <%= check_box_tag :remember_me, "1", false, class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %>
+              <span class="ml-2 text-sm text-gray-700">Ingat saya</span>
+            </label>
+          </div>
+
+          <!-- Submit Button -->
+          <div>
+            <%= submit_tag "Masuk", 
+              class: "w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-lg font-semibold shadow-lg transform hover:-translate-y-1 transition-all duration-200"
+            %>
+          </div>
+        <% end %>
+
+        <!-- Info -->
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+          <p class="text-sm text-blue-900">
+            <i class="fas fa-info-circle mr-2"></i>
+            <strong>Catatan:</strong> Sistem akan mengenali role Anda secara otomatis dan mengarahkan ke dashboard yang sesuai.
+          </p>
+        </div>
+      </div>
+
+      <!-- Info Cards -->
+      <div class="grid md:grid-cols-3 gap-4 mt-8">
+        <div class="bg-white p-4 rounded-lg shadow text-center">
+          <i class="fas fa-shield-alt text-3xl text-blue-600 mb-2"></i>
+          <p class="text-sm text-gray-600">Data terenkripsi & aman</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow text-center">
+          <i class="fas fa-clock text-3xl text-green-600 mb-2"></i>
+          <p class="text-sm text-gray-600">Akses 24/7</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow text-center">
+          <i class="fas fa-mobile-alt text-3xl text-purple-600 mb-2"></i>
+          <p class="text-sm text-gray-600">Mobile app available</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function togglePassword() {
+      const passwordField = document.getElementById('password-field');
+      const toggleIcon = document.getElementById('toggle-icon');
+      
+      if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        toggleIcon.classList.remove('fa-eye');
+        toggleIcon.classList.add('fa-eye-slash');
+      } else {
+        passwordField.type = 'password';
+        toggleIcon.classList.remove('fa-eye-slash');
+        toggleIcon.classList.add('fa-eye');
+      }
+    }
+  </script>
+
+</body>
+</html>
