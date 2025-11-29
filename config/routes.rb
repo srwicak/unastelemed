@@ -134,6 +134,7 @@ Rails.application.routes.draw do
         post :cancel
         put :add_interpretation
         put :add_notes
+        post :recover_data  # NEW: endpoint untuk upload data yang tertinggal
       end
       collection do
         post :start

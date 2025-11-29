@@ -116,6 +116,36 @@ class Recording < ApplicationRecord
     end
   end
   
+  # Check if recording has any batch data
+  def has_batch_data?
+    biopotential_batches.exists?
+  end
+  
+  # Get data completeness status
+  def data_status
+    return :no_data if !has_batch_data? && status == 'completed'
+    return :incomplete if !has_batch_data? && status == 'recording'
+    return :partial if has_batch_data? && (total_samples.nil? || total_samples == 0)
+    return :complete if has_batch_data?
+    :unknown
+  end
+  
+  # Get user-friendly message about data status
+  def data_status_message
+    case data_status
+    when :no_data
+      "⚠️ Data EKG tidak tersimpan. Mobile app tidak mengirim data batch selama recording."
+    when :incomplete
+      "⏳ Recording sedang berlangsung. Menunggu data dari mobile app..."
+    when :partial
+      "⚠️ Data EKG tidak lengkap. Beberapa batch mungkin tidak terkirim."
+    when :complete
+      "✓ Data EKG lengkap"
+    else
+      "❓ Status data tidak diketahui"
+    end
+  end
+  
   private
   
   def set_default_status

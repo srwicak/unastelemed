@@ -138,9 +138,24 @@ class RecordingsController < ApplicationController
     # Sort data by timestamp to ensure correct drawing order
     data.sort_by! { |point| point[:x] }
     
+    # Add caching headers for completed recordings
+    if @recording.status == 'completed'
+      expires_in 1.hour, public: true
+    else
+      # Short cache for active recordings
+      expires_in 10.seconds, public: true
+    end
+    
     render json: {
       type: 'raw',
-      data: data
+      data: data,
+      meta: {
+        start_time: start_time.iso8601(3),
+        end_time: end_time.iso8601(3),
+        sample_count: data.size,
+        skip_factor: skip,
+        recording_status: @recording.status
+      }
     }
   end
 

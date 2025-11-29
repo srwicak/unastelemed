@@ -3,8 +3,8 @@ class Api::RecordingsController < ApplicationController
   skip_before_action :authenticate_user!
   # Require authentication for most API endpoints. Keep start/data/stop/show public for device flow.
   # Note: `index` now requires authentication so mobile users can only fetch their own recordings (or doctors).
-  before_action :authenticate_request, except: [:show, :start, :data, :stop]
-  before_action :set_recording, only: [:show, :update, :destroy, :chart_data, :complete, :cancel, :add_interpretation, :add_notes]
+  before_action :authenticate_request, except: [:show, :start, :data, :stop, :recover_data]
+  before_action :set_recording, only: [:show, :update, :destroy, :chart_data, :complete, :cancel, :add_interpretation, :add_notes, :recover_data]
   before_action :set_recording_for_stop_and_data, only: [:stop, :data]
   
   def index
@@ -495,6 +495,70 @@ class Api::RecordingsController < ApplicationController
         message: 'Failed to cancel recording'
       }, status: :unprocessable_entity
     end
+  end
+  
+  # POST /api/recordings/:id/recover_data
+  # Endpoint untuk mobile app mengirim data yang tertinggal
+  def recover_data
+    batches_param = params[:batches] || []
+    
+    unless batches_param.is_a?(Array) && batches_param.any?
+      return render json: {
+        success: false,
+        error: 'Batches data tidak ditemukan atau kosong',
+        message: 'Kirim array of batch_data dalam parameter batches'
+      }, status: :bad_request
+    end
+    
+    processed_batches = []
+    failed_batches = []
+    duplicate_batches = []
+    
+    batches_param.each_with_index do |batch_data, index|
+      begin
+        result = process_batch_data(batch_data)
+        
+        if result[:is_duplicate]
+          duplicate_batches << {
+            batch_sequence: result[:batch_sequence],
+            message: 'Batch sudah ada'
+          }
+        else
+          processed_batches << {
+            batch_sequence: result[:batch_sequence],
+            samples_count: result[:samples_count]
+          }
+        end
+        
+        Rails.logger.info "Recovery: Processed batch #{index + 1}/#{batches_param.size}"
+      rescue StandardError => e
+        Rails.logger.error "Recovery: Error processing batch #{index}: #{e.message}"
+        failed_batches << {
+          batch_sequence: batch_data['batch_sequence'] || index,
+          error: e.message
+        }
+      end
+    end
+    
+    # Reload to get updated counts
+    @recording.reload
+    
+    render json: {
+      success: true,
+      message: 'Data recovery selesai',
+      data: {
+        recording_id: @recording.id,
+        session_id: @recording.session_id,
+        processed_count: processed_batches.size,
+        duplicate_count: duplicate_batches.size,
+        failed_count: failed_batches.size,
+        total_batches: @recording.biopotential_batches.count,
+        total_samples: @recording.total_samples,
+        processed_batches: processed_batches,
+        duplicate_batches: duplicate_batches,
+        failed_batches: failed_batches
+      }
+    }, status: :ok
   end
   
   def chart_data

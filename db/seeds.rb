@@ -499,6 +499,79 @@ puts "\n  ✅ Created #{batch_count} batches (#{recording3.total_samples} sample
 
 puts "✅ Session untuk #{patient3.name} (Completed, not reviewed)"
 
+# 8. Create Recording with INCOMPLETE data (simulate connection lost)
+puts "\n📊 Creating Recording with Incomplete Data (simulating connection issue)..."
+session4 = RecordingSession.find_or_create_by!(
+  patient: patient1,
+  medical_staff: nurse2
+) do |session|
+  session.session_id = SecureRandom.hex(8)
+  session.status = 'completed'
+  session.started_at = 3.days.ago
+  session.ended_at = 3.days.ago + 5.minutes  # Short recording
+  session.interpretation_completed = false
+end
+
+qr4 = QrCode.find_or_create_by!(recording_session: session4) do |qr|
+  qr.code = SecureRandom.hex(16)
+  qr.hospital = rs_cipto
+  qr.healthcare_provider = nurse2_user
+  qr.patient = patient1
+  qr.valid_from = 3.days.ago
+  qr.valid_until = 3.days.ago + 1.hour
+  qr.expires_at = 3.days.ago + 1.hour
+  qr.max_duration_minutes = 60
+  qr.is_used = true
+end
+
+# Recording yang data nya tidak lengkap (koneksi putus di tengah)
+recording4 = Recording.find_or_create_by!(session_id: session4.session_id) do |rec|
+  rec.patient = patient1
+  rec.hospital = rs_cipto
+  rec.user = nurse2_user
+  rec.status = 'completed'
+  rec.start_time = 3.days.ago
+  rec.end_time = 3.days.ago + 5.minutes
+  rec.duration_seconds = 300  # 5 minutes total
+  rec.sample_rate = 500.0
+  rec.total_samples = 0
+  rec.reviewed_by_doctor = false
+  rec.has_notes = false
+end
+
+# Hanya buat beberapa batch awal (simulasi koneksi putus setelah 30 detik)
+puts "  📊 Creating partial EKG data (connection lost after 30 seconds)..."
+batch_count = 0
+heart_rate = 78
+3.times do |i|  # Hanya 3 batch = 30 detik dari target 5 menit
+  batch_start = 3.days.ago + (i * 10).seconds
+  batch_end = batch_start + 10.seconds
+  
+  samples = []
+  5000.times do |j|
+    time_in_seconds = (i * 10) + (j / 500.0)
+    value = generate_ekg_sample(time_in_seconds, heart_rate)
+    samples << value
+  end
+  
+  BiopotentialBatch.find_or_create_by!(
+    recording_id: recording4.id,
+    batch_sequence: i
+  ) do |batch|
+    batch.start_timestamp = batch_start
+    batch.end_timestamp = batch_end
+    batch.sample_rate = 500.0
+    batch.sample_count = samples.size
+    batch.data = { samples: samples }
+  end
+  
+  batch_count += 1
+end
+
+recording4.update!(total_samples: batch_count * 5000)
+puts "  ⚠️  Created only #{batch_count} batches (#{recording4.total_samples} samples) - Missing data after 30s!"
+puts "✅ Session untuk #{patient1.name} (Completed, INCOMPLETE DATA)"
+
 puts "\n✨ Seeding completed!"
 puts "\n" + "="*60
 puts "📋 LOGIN CREDENTIALS"

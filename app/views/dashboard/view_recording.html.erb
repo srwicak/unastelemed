@@ -19,23 +19,75 @@
     <div class="chart-section">
       <h2>Grafik Data EKG</h2>
       
+      <!-- ALWAYS show chart container, even if batches is empty or incomplete -->
+      <div class="chart-info">
+        <p><strong>Total Batches:</strong> <%= @batches.count %> <%= @batches.count > 0 ? "(showing first 100)" : "" %></p>
+        <p><strong>Total Samples:</strong> <%= @recording.total_samples || 0 %></p>
+        <p><strong>Sample Rate:</strong> <%= @recording.sample_rate || 500 %> Hz</p>
+        <p><strong>Duration:</strong> <%= @recording.formatted_duration %></p>
+        <% if @recording.data_status != :complete %>
+          <p class="status-badge <%= @recording.data_status %>">
+            <strong>Status:</strong> <%= @recording.data_status_message %>
+          </p>
+        <% end %>
+      </div>
+      
       <% if @batches.any? %>
-        <div class="chart-info">
-          <p><strong>Total Batches:</strong> <%= @batches.count %></p>
-          <p><strong>Total Samples:</strong> <%= @recording.total_samples || 'N/A' %></p>
-          <p><strong>Sample Rate:</strong> <%= @recording.sample_rate || 500 %> Hz</p>
-          <p><strong>Duration:</strong> <%= @recording.formatted_duration %></p>
-        </div>
-        
+        <!-- Has data - show chart -->
         <div class="chart-container">
           <canvas id="medicalChart" width="800" height="400"></canvas>
         </div>
       <% else %>
-        <div class="no-data-message">
-          <p>⏳ Belum ada data EKG yang tersedia.</p>
-          <% if @recording.status == 'recording' %>
-            <p>Recording sedang berlangsung. Data akan muncul setelah mobile app mengirim batch pertama.</p>
-          <% end %>
+        <!-- No data yet - show placeholder with helpful message -->
+        <div class="no-data-placeholder">
+          <div class="placeholder-chart">
+            <canvas id="medicalChart" width="800" height="400"></canvas>
+          </div>
+          <div class="overlay-message">
+            <% if @recording.status == 'recording' %>
+              <div class="status-icon rotating">⏳</div>
+              <h3>Menunggu Data dari Mobile App...</h3>
+              <p>Grafik akan muncul otomatis setelah batch pertama diterima (±10 detik)</p>
+              <div class="auto-refresh-indicator">
+                <span class="pulse-dot"></span>
+                Auto-refresh setiap 10 detik
+              </div>
+            <% elsif @recording.data_status == :no_data %>
+              <div class="status-icon">⚠️</div>
+              <h3>Data EKG Tidak Tersedia</h3>
+              <div class="error-details">
+                <p><strong>Kemungkinan Penyebab:</strong></p>
+                <ul>
+                  <li>Mobile app tidak mengirim data batch selama recording</li>
+                  <li>Koneksi internet terputus saat recording</li>
+                  <li>Perangkat kehabisan baterai sebelum data terkirim</li>
+                  <li>Recording dihentikan sebelum batch pertama dikirim</li>
+                </ul>
+                
+                <p><strong>Informasi Recording:</strong></p>
+                <ul>
+                  <li>Status: <span class="badge badge-<%= @recording.status %>"><%= @recording.status.titleize %></span></li>
+                  <li>Waktu Mulai: <%= @recording.start_time&.strftime('%d %B %Y %H:%M:%S') || 'N/A' %></li>
+                  <li>Waktu Selesai: <%= @recording.end_time&.strftime('%d %B %Y %H:%M:%S') || 'N/A' %></li>
+                  <li>Durasi: <%= @recording.formatted_duration %></li>
+                </ul>
+                
+                <div class="action-hint">
+                  <p><strong>💡 Saran:</strong></p>
+                  <ul>
+                    <li>Lakukan recording ulang untuk mendapatkan data yang lengkap</li>
+                    <li>Pastikan mobile app sudah update ke versi terbaru</li>
+                    <li>Pastikan koneksi internet stabil selama recording</li>
+                    <li>Pastikan perangkat memiliki baterai cukup</li>
+                  </ul>
+                </div>
+              </div>
+            <% else %>
+              <div class="status-icon">📊</div>
+              <h3>Belum Ada Data</h3>
+              <p>Menunggu data dari perangkat...</p>
+            <% end %>
+          </div>
         </div>
       <% end %>
     </div>
@@ -185,6 +237,8 @@ const RECORDING_END_TIME = new Date("<%= ((@recording.end_time || @recording.sta
 const TOTAL_DURATION = RECORDING_END_TIME - START_TIME;
 const INITIAL_WINDOW = 10 * 1000; // 10 seconds
 const BUFFER_SIZE = 20 * 1000; // Keep 20s buffer on each side
+const IS_RECORDING = <%= @recording.status == 'recording' ? 'true' : 'false' %>;
+const HAS_DATA = <%= @batches.any? ? 'true' : 'false' %>;
 
 // State
 let currentChart = null;
@@ -197,13 +251,22 @@ let dragEndTime = null;
 let selectionBox = null;
 let annotations = [];
 let loadedRanges = []; // Array of {start, end}
+let dataCache = {}; // Cache loaded data by time range key
+let lastDataFetch = 0; // Timestamp of last fetch
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
   initChart();
-  // Fetch initial window + buffer
-  fetchDataBuffered(START_TIME, Math.min(START_TIME + INITIAL_WINDOW, RECORDING_END_TIME));
-  fetchAnnotations();
+  
+  // Only fetch data if we have batches
+  if (HAS_DATA) {
+    fetchDataBuffered(START_TIME, Math.min(START_TIME + INITIAL_WINDOW, RECORDING_END_TIME));
+    fetchAnnotations();
+  } else {
+    // Show empty chart with grid
+    updateChartData({ type: 'empty', data: [] }, START_TIME);
+  }
+  
   setupControls();
   setupDragSelection();
   
@@ -221,6 +284,11 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+  
+  // Auto-refresh if recording is active
+  if (IS_RECORDING) {
+    startAutoRefresh();
+  }
 });
 
 function setupControls() {
@@ -462,7 +530,24 @@ function checkBuffer(visibleStartSec, visibleEndSec) {
 
 async function fetchDataBuffered(startTimeMs, endTimeMs) {
   if (isLoading) return;
+  
+  // Check cache first
+  const cacheKey = `${startTimeMs}_${endTimeMs}`;
+  if (dataCache[cacheKey]) {
+    console.log('Using cached data for', cacheKey);
+    updateChartData(dataCache[cacheKey], startTimeMs);
+    return;
+  }
+  
+  // Throttle requests (min 200ms between fetches)
+  const now = Date.now();
+  if (now - lastDataFetch < 200) {
+    console.log('Throttling data fetch');
+    return;
+  }
+  
   isLoading = true;
+  lastDataFetch = now;
   
   try {
     const startIso = new Date(startTimeMs).toISOString();
@@ -470,6 +555,9 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
     
     const response = await fetch(`/recordings/${RECORDING_ID}/data?start_time=${startIso}&end_time=${endIso}`);
     const result = await response.json();
+    
+    // Cache the result
+    dataCache[cacheKey] = result;
     
     // Update loaded ranges
     loadedRanges = [{start: startTimeMs, end: endTimeMs}];
@@ -487,7 +575,10 @@ function updateChartData(result, startTimeMs) {
   
   let newData = [];
   
-  if (result.type === 'summary') {
+  if (result.type === 'empty') {
+    // Empty data - show empty chart
+    newData = [];
+  } else if (result.type === 'summary') {
     result.data.forEach(d => {
       // Convert timestamp to seconds from recording start
       const seconds = (d.t - START_TIME) / 1000;
@@ -915,22 +1006,207 @@ function resetZoom() {
     currentChart.scales.x.min = 0;
     currentChart.scales.x.max = 10;
     currentChart.update();
+    
+    // Clear cache and refetch initial data
+    dataCache = {};
     fetchDataBuffered(START_TIME, START_TIME + INITIAL_WINDOW + BUFFER_SIZE);
   }
 }
 
-// Auto refresh logic
-<% if @recording.status == 'recording' %>
-setInterval(function() {
-  const {max} = currentChart.scales.x;
-  if (max >= RECORDING_END_TIME - 5000) {
-     location.reload();
+// Auto-refresh for active recordings
+let autoRefreshInterval = null;
+
+function startAutoRefresh() {
+  console.log('Starting auto-refresh for active recording');
+  
+  // Refresh every 10 seconds
+  autoRefreshInterval = setInterval(async function() {
+    console.log('Auto-refreshing data...');
+    
+    // Clear cache to force fresh data
+    dataCache = {};
+    
+    // Get current view window
+    const {min, max} = currentChart.scales.x;
+    const visibleStartMs = START_TIME + (min * 1000);
+    const visibleEndMs = START_TIME + (max * 1000);
+    
+    // Fetch latest data for current view
+    await fetchDataBuffered(visibleStartMs, visibleEndMs);
+    
+    // Check if recording is still active
+    try {
+      const response = await fetch(`/api/recordings/${RECORDING_ID}`);
+      const result = await response.json();
+      
+      if (result.data.recording.status !== 'recording') {
+        console.log('Recording completed, stopping auto-refresh');
+        stopAutoRefresh();
+        
+        // Show notification
+        showNotification('Recording selesai! Data lengkap sudah tersedia.', 'success');
+        
+        // Reload page to show complete data
+        setTimeout(() => location.reload(), 2000);
+      } else if (result.data.recording.total_batches > 0 && !HAS_DATA) {
+        // Data baru tersedia, reload page
+        console.log('New data available, reloading page');
+        location.reload();
+      }
+    } catch (error) {
+      console.error('Error checking recording status:', error);
+    }
+  }, 10000); // 10 seconds
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval);
+    autoRefreshInterval = null;
   }
-}, 30000);
-<% end %>
+}
+
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+  notification.textContent = message;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    background: ${type === 'success' ? '#28a745' : '#667eea'};
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+  `;
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 5000);
+}
 </script>
 
 <style>
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.1); }
+}
+
+.rotating {
+  display: inline-block;
+  animation: rotate 2s linear infinite;
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #28a745;
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.auto-refresh-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: rgba(40, 167, 69, 0.1);
+  border-radius: 20px;
+  font-size: 14px;
+  color: #28a745;
+}
+
+.no-data-placeholder {
+  position: relative;
+  min-height: 400px;
+}
+
+.placeholder-chart {
+  opacity: 0.3;
+}
+
+.overlay-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 10;
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  max-width: 600px;
+  width: 90%;
+}
+
+.overlay-message .status-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.overlay-message h3 {
+  margin: 0 0 16px 0;
+  color: #2c3e50;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.status-badge.no_data {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.incomplete {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-badge.partial {
+  background: #f8d7da;
+  color: #721c24;
+}
+
 .recording-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -999,9 +1275,95 @@ setInterval(function() {
   color: #6c757d;
 }
 
-.no-data-message p:first-child {
+.no-data-message.error-state {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+}
+
+.no-data-message .status-icon {
+  margin-bottom: 16px;
+}
+
+.no-data-message h3 {
   font-size: 18px;
-  margin-bottom: 12px;
+  margin-bottom: 24px;
+  color: #495057;
+}
+
+.no-data-message.error-state h3 {
+  color: #856404;
+}
+
+.error-details, .info-details {
+  text-align: left;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.error-details p, .info-details p {
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.error-details ul, .info-details ul {
+  margin: 8px 0 16px 20px;
+  padding: 0;
+  list-style: disc;
+}
+
+.error-details li, .info-details li {
+  margin: 6px 0;
+  color: #495057;
+  font-size: 14px;
+}
+
+.error-details strong {
+  color: #2c3e50;
+  font-size: 15px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge-recording {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.badge-failed {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.action-hint {
+  margin-top: 20px;
+  padding: 16px;
+  background: #e7f3ff;
+  border-left: 4px solid #2196f3;
+  border-radius: 4px;
+}
+
+.action-hint p {
+  margin: 8px 0;
+}
+
+.action-hint strong {
+  color: #1976d2;
 }
 
 .chart-container {
