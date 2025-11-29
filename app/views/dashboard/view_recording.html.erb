@@ -37,6 +37,24 @@
         <div class="chart-container">
           <canvas id="medicalChart" width="800" height="400"></canvas>
         </div>
+        
+        <!-- DEBUG PANEL - Temporary for troubleshooting -->
+        <div id="debugPanel" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; font-family: monospace; font-size: 12px;">
+          <h4 style="margin-top: 0;">🔍 Debug Info (Temporary)</h4>
+          <div id="debugInfo">
+            <p><strong>JavaScript Variables:</strong></p>
+            <pre id="jsVars" style="background: white; padding: 10px; border-radius: 3px; overflow-x: auto;"></pre>
+            
+            <p><strong>Chart Dataset:</strong></p>
+            <pre id="chartData" style="background: white; padding: 10px; border-radius: 3px; max-height: 200px; overflow: auto;"></pre>
+            
+            <p><strong>Last API Response:</strong></p>
+            <pre id="apiResponse" style="background: white; padding: 10px; border-radius: 3px; max-height: 300px; overflow: auto;"></pre>
+            
+            <p><strong>Loaded Ranges:</strong></p>
+            <pre id="loadedRanges" style="background: white; padding: 10px; border-radius: 3px; overflow-x: auto;"></pre>
+          </div>
+        </div>
       <% else %>
         <!-- No data yet - show placeholder with helpful message -->
         <div class="no-data-placeholder">
@@ -265,6 +283,9 @@ let lastDataFetch = 0; // Timestamp of last fetch
 document.addEventListener('DOMContentLoaded', function() {
   initChart();
   
+  // Update debug panel on load
+  updateDebugPanel();
+  
   // Only fetch data if we have batches
   if (HAS_DATA) {
     fetchDataBuffered(START_TIME, Math.min(START_TIME + INITIAL_WINDOW, RECORDING_END_TIME));
@@ -297,6 +318,47 @@ document.addEventListener('DOMContentLoaded', function() {
     startAutoRefresh();
   }
 });
+
+// Debug panel update function
+function updateDebugPanel() {
+  const debugPanel = document.getElementById('debugPanel');
+  if (!debugPanel) return; // Panel might not exist if no batches
+  
+  // JavaScript variables
+  document.getElementById('jsVars').textContent = JSON.stringify({
+    RECORDING_ID,
+    START_TIME: new Date(START_TIME).toISOString(),
+    RECORDING_END_TIME: new Date(RECORDING_END_TIME).toISOString(),
+    TOTAL_DURATION: (TOTAL_DURATION / 1000).toFixed(2) + 's',
+    IS_RECORDING,
+    HAS_DATA,
+    isLoading,
+    cacheKeys: Object.keys(dataCache).length
+  }, null, 2);
+  
+  // Chart dataset
+  if (currentChart && currentChart.data.datasets[0]) {
+    const data = currentChart.data.datasets[0].data;
+    const sample = data.slice(0, 10); // First 10 points
+    document.getElementById('chartData').textContent = 
+      `Total Points: ${data.length}\n\n` +
+      `First 10 points:\n${JSON.stringify(sample, null, 2)}\n\n` +
+      (data.length > 10 ? `Last point: ${JSON.stringify(data[data.length - 1], null, 2)}` : '');
+  } else {
+    document.getElementById('chartData').textContent = 'Chart not initialized or no data';
+  }
+  
+  // Loaded ranges
+  document.getElementById('loadedRanges').textContent = JSON.stringify(
+    loadedRanges.map(r => ({
+      start: new Date(r.start).toISOString(),
+      end: new Date(r.end).toISOString(),
+      duration: ((r.end - r.start) / 1000).toFixed(2) + 's'
+    })),
+    null,
+    2
+  );
+}
 
 function setupControls() {
   const controlsDiv = document.querySelector('.chart-controls') || createControlsDiv();
@@ -572,11 +634,36 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
     
     console.log('Received data:', result);
     
+    // Update API response in debug panel
+    if (document.getElementById('apiResponse')) {
+      document.getElementById('apiResponse').textContent = JSON.stringify(result, null, 2);
+    }
+    
     // Cache the result
     dataCache[cacheKey] = result;
     
-    // Update loaded ranges
-    loadedRanges = [{start: startTimeMs, end: endTimeMs}];
+    // Update loaded ranges (merge, don't replace)
+    const newRange = {start: startTimeMs, end: endTimeMs};
+    const overlaps = loadedRanges.some(r => 
+      (newRange.start >= r.start && newRange.start <= r.end) ||
+      (newRange.end >= r.start && newRange.end <= r.end) ||
+      (newRange.start <= r.start && newRange.end >= r.end)
+    );
+    
+    if (!overlaps) {
+      loadedRanges.push(newRange);
+      // Sort and merge adjacent ranges
+      loadedRanges.sort((a, b) => a.start - b.start);
+      const merged = [];
+      for (const range of loadedRanges) {
+        if (merged.length === 0 || merged[merged.length - 1].end < range.start) {
+          merged.push(range);
+        } else {
+          merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, range.end);
+        }
+      }
+      loadedRanges = merged;
+    }
     
     updateChartData(result, startTimeMs);
   } catch (error) {
@@ -600,8 +687,9 @@ function updateChartData(result, startTimeMs) {
   let newData = [];
   
   if (result.type === 'empty') {
-    // Empty data - show empty chart
-    newData = [];
+    // Empty data - keep existing data, don't clear
+    console.log('Empty result, keeping existing data');
+    return;
   } else if (result.type === 'summary') {
     result.data.forEach(d => {
       // Convert timestamp to seconds from recording start
@@ -609,27 +697,53 @@ function updateChartData(result, startTimeMs) {
       newData.push({ x: seconds, y: d.min });
       newData.push({ x: seconds, y: d.max });
     });
-    newData.sort((a, b) => a.x - b.x);
-  } else {
-    // Convert timestamps to seconds from recording start
+  } else if (result.type === 'raw') {
+    // Server sends {x: timestamp_ms, y: value}
     result.data.forEach(d => {
       const seconds = (d.x - START_TIME) / 1000;
       newData.push({ x: seconds, y: d.y });
     });
-    newData.sort((a, b) => a.x - b.x);
   }
   
-  console.log('After conversion:', {
+  if (newData.length === 0) {
+    console.log('No new data to add');
+    return;
+  }
+  
+  // Merge with existing data instead of replacing
+  const existingData = currentChart.data.datasets[0].data || [];
+  const allData = [...existingData, ...newData];
+  
+  // Remove duplicates based on x value (timestamp)
+  const uniqueData = [];
+  const seenX = new Set();
+  for (const point of allData) {
+    const key = Math.round(point.x * 1000); // Round to millisecond precision
+    if (!seenX.has(key)) {
+      seenX.add(key);
+      uniqueData.push(point);
+    }
+  }
+  
+  // Sort by x (time)
+  uniqueData.sort((a, b) => a.x - b.x);
+  
+  console.log('After conversion and merge:', {
     newDataLength: newData.length,
-    firstConverted: newData[0],
-    lastConverted: newData[newData.length - 1],
-    sampleMiddle: newData[Math.floor(newData.length / 2)]
+    existingDataLength: existingData.length,
+    mergedLength: uniqueData.length,
+    firstPoint: uniqueData[0],
+    lastPoint: uniqueData[uniqueData.length - 1],
+    sampleMiddle: uniqueData[Math.floor(uniqueData.length / 2)]
   });
   
-  currentChart.data.datasets[0].data = newData;
+  currentChart.data.datasets[0].data = uniqueData;
   currentChart.update('none');
   
-  console.log('Chart updated. Dataset length:', currentChart.data.datasets[0].data.length);
+  console.log('Chart updated. Total dataset length:', currentChart.data.datasets[0].data.length);
+  
+  // Update debug panel after chart update
+  updateDebugPanel();
 }
 
 function toggleAnnotationMode() {
