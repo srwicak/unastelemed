@@ -288,7 +288,13 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Only fetch data if we have batches
   if (HAS_DATA) {
-    fetchDataBuffered(START_TIME, Math.min(START_TIME + INITIAL_WINDOW, RECORDING_END_TIME));
+    const initialEnd = Math.min(START_TIME + INITIAL_WINDOW, RECORDING_END_TIME);
+    console.log('🚀 Initiating data fetch:', {
+      START_TIME: new Date(START_TIME).toISOString(),
+      initialEnd: new Date(initialEnd).toISOString(),
+      INITIAL_WINDOW: INITIAL_WINDOW + 'ms'
+    });
+    fetchDataBuffered(START_TIME, initialEnd);
     fetchAnnotations();
   } else {
     // Show empty chart with grid
@@ -598,12 +604,21 @@ function checkBuffer(visibleStartSec, visibleEndSec) {
 }
 
 async function fetchDataBuffered(startTimeMs, endTimeMs) {
-  if (isLoading) return;
+  console.log('📥 fetchDataBuffered called:', {
+    startTimeMs: new Date(startTimeMs).toISOString(),
+    endTimeMs: new Date(endTimeMs).toISOString(),
+    isLoading
+  });
+  
+  if (isLoading) {
+    console.log('⏸️ Already loading, skipping...');
+    return;
+  }
   
   // Check cache first
   const cacheKey = `${startTimeMs}_${endTimeMs}`;
   if (dataCache[cacheKey]) {
-    console.log('Using cached data for', cacheKey);
+    console.log('💾 Using cached data for', cacheKey);
     updateChartData(dataCache[cacheKey], startTimeMs);
     return;
   }
@@ -611,7 +626,7 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
   // Throttle requests (min 200ms between fetches)
   const now = Date.now();
   if (now - lastDataFetch < 200) {
-    console.log('Throttling data fetch');
+    console.log('⏱️ Throttling data fetch (last fetch:', now - lastDataFetch, 'ms ago)');
     return;
   }
   
@@ -622,7 +637,7 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
     const startIso = new Date(startTimeMs).toISOString();
     const endIso = new Date(endTimeMs).toISOString();
     
-    console.log('Fetching data:', {
+    console.log('🌐 Fetching data from API:', {
       recording_id: RECORDING_ID,
       start_time: startIso,
       end_time: endIso,
@@ -630,9 +645,14 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
     });
     
     const response = await fetch(`/recordings/${RECORDING_ID}/data?start_time=${startIso}&end_time=${endIso}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const result = await response.json();
     
-    console.log('Received data:', result);
+    console.log('✅ Received data:', result);
     
     // Update API response in debug panel
     if (document.getElementById('apiResponse')) {
@@ -667,9 +687,17 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
     
     updateChartData(result, startTimeMs);
   } catch (error) {
-    console.error('Error fetching data:', error);
+    console.error('❌ Error fetching data:', error);
+    
+    // Update debug panel with error
+    if (document.getElementById('apiResponse')) {
+      document.getElementById('apiResponse').textContent = 
+        'ERROR: ' + error.message + '\n\n' +
+        'Stack: ' + error.stack;
+    }
   } finally {
     isLoading = false;
+    updateDebugPanel();
   }
 }
 
