@@ -106,7 +106,7 @@ class Api::RecordingsController < ApplicationController
     device_id = recording_params[:device_id] || params[:device_id]
     device_name = recording_params[:device_name] || params[:device_name]
     user_id = recording_params[:user_id] || params[:user_id]
-    sample_rate = recording_params[:sample_rate] || params[:sample_rate] || 500.0
+    sample_rate = recording_params[:sample_rate] || params[:sample_rate] || 400.0
     start_time = recording_params[:start_time] || params[:start_time]
     
     # Try to find QR code by session_id if provided
@@ -742,7 +742,7 @@ class Api::RecordingsController < ApplicationController
     end_time = Time.zone.parse(batch_data['end_timestamp']) rescue (start_time + 10.seconds)
     samples = batch_data['samples'] || []
     batch_sequence = batch_data['batch_sequence'] || @recording.biopotential_batches.count
-    sample_rate = batch_data['sample_rate'] || @recording.sample_rate || 500.0
+    sample_rate = batch_data['sample_rate'] || @recording.sample_rate || 400.0
     
     # Validate max samples per batch (prevent abuse)
     max_samples = 10_000

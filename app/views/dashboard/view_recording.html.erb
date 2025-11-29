@@ -23,7 +23,18 @@
       <div class="chart-info">
         <p><strong>Total Batches:</strong> <%= @batches.count %> <%= @batches.count > 0 ? "(showing first 100)" : "" %></p>
         <p><strong>Total Samples:</strong> <%= @recording.total_samples || 0 %></p>
-        <p><strong>Sample Rate:</strong> <%= @recording.sample_rate || 500 %> Hz</p>
+        <p><strong>Sample Rate:</strong> 
+          <% if @batches.any? %>
+            <% rates = @batches.map(&:sample_rate).compact %>
+            <% if rates.uniq.size == 1 %>
+              <%= rates.first.round(1) %> Hz
+            <% else %>
+              <%= rates.min.round(1) %>-<%= rates.max.round(1) %> Hz (avg: <%= (rates.sum / rates.size).round(1) %> Hz)
+            <% end %>
+          <% else %>
+            <%= @recording.sample_rate || 400 %> Hz
+          <% end %>
+        </p>
         <p><strong>Duration:</strong> <%= @recording.formatted_duration %></p>
         <% if @recording.data_status != :complete %>
           <p class="status-badge <%= @recording.data_status %>">

@@ -10,6 +10,7 @@ class BiopotentialBatch < ApplicationRecord
   validates :data, presence: true
   validate :validate_data_structure
   validate :end_timestamp_after_start_timestamp
+  # Removed: validate_sample_rate_reasonable - we log warnings instead of rejecting
   
   # Scopes
   scope :ordered, -> { order(:batch_sequence) }
@@ -21,6 +22,7 @@ class BiopotentialBatch < ApplicationRecord
   
   # Callbacks
   before_save :calculate_min_max
+  after_save :log_sample_rate_warning
 
   # Get all samples as flat array
   def samples
@@ -151,5 +153,23 @@ class BiopotentialBatch < ApplicationRecord
     
     self.min_value = vals.min
     self.max_value = vals.max
+  end
+  
+  # Log warning if sample_rate deviates significantly from expected
+  # BUT STILL SAVE THE DATA - never reject data!
+  def log_sample_rate_warning
+    return unless sample_rate.present?
+    
+    target_hz = recording&.sample_rate || 400.0
+    min_acceptable = target_hz * 0.80  # 320 Hz for 400 Hz target
+    max_acceptable = target_hz * 1.20  # 480 Hz for 400 Hz target
+    
+    if sample_rate < min_acceptable || sample_rate > max_acceptable
+      Rails.logger.warn "[BiopotentialBatch##{id}] Sample rate warning: " \
+                        "Got #{sample_rate} Hz, expected ~#{target_hz} Hz (±20%). " \
+                        "Acceptable range: #{min_acceptable}-#{max_acceptable} Hz. " \
+                        "Recording##{recording_id}, Batch##{batch_sequence}. " \
+                        "DATA SAVED - this is just a warning."
+    end
   end
 end

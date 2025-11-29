@@ -321,11 +321,11 @@ heart_rate = 75 # 75 BPM - normal heart rate
   batch_start = 2.days.ago + (i * 10).seconds
   batch_end = batch_start + 10.seconds
   
-  # Generate realistic EKG waveform samples (5000 samples per batch = 10 seconds at 500 Hz)
+  # Generate realistic EKG waveform samples (4000 samples per batch = 10 seconds at 400 Hz)
   samples = []
-  5000.times do |j|
+  4000.times do |j|
     # Calculate absolute time in seconds from start of recording
-    time_in_seconds = (i * 10) + (j / 500.0)
+    time_in_seconds = (i * 10) + (j / 400.0)
     
     # Generate realistic EKG sample
     value = generate_ekg_sample(time_in_seconds, heart_rate)
@@ -338,7 +338,7 @@ heart_rate = 75 # 75 BPM - normal heart rate
   ) do |batch|
     batch.start_timestamp = batch_start
     batch.end_timestamp = batch_end
-    batch.sample_rate = 500.0
+    batch.sample_rate = 400.0
     batch.sample_count = samples.size
     batch.data = { samples: samples }
   end
@@ -348,7 +348,7 @@ heart_rate = 75 # 75 BPM - normal heart rate
 end
 
 # Update total samples
-recording1.update!(total_samples: batch_count * 5000)
+recording1.update!(total_samples: batch_count * 4000)
 puts "\n  ✅ Created #{batch_count} batches (#{recording1.total_samples} samples)"
 
 puts "✅ Session untuk #{patient1.name} (Completed)"
@@ -397,9 +397,9 @@ heart_rate = 82 # 82 BPM - slightly elevated (patient might be anxious)
   batch_end = batch_start + 10.seconds
   
   samples = []
-  5000.times do |j|
+  4000.times do |j|
     # Calculate absolute time in seconds from start of recording
-    time_in_seconds = (i * 10) + (j / 500.0)
+    time_in_seconds = (i * 10) + (j / 400.0)
     
     # Generate realistic EKG sample
     value = generate_ekg_sample(time_in_seconds, heart_rate)
@@ -412,7 +412,7 @@ heart_rate = 82 # 82 BPM - slightly elevated (patient might be anxious)
   ) do |batch|
     batch.start_timestamp = batch_start
     batch.end_timestamp = batch_end
-    batch.sample_rate = 500.0
+    batch.sample_rate = 400.0
     batch.sample_count = samples.size
     batch.data = { samples: samples }
   end
@@ -420,7 +420,7 @@ heart_rate = 82 # 82 BPM - slightly elevated (patient might be anxious)
   batch_count += 1
 end
 
-recording2.update!(total_samples: batch_count * 5000)
+recording2.update!(total_samples: batch_count * 4000)
 puts "  ✅ Created #{batch_count} batches (#{recording2.total_samples} samples)"
 
 puts "✅ Session untuk #{patient2.name} (Active)"
@@ -473,8 +473,8 @@ heart_rate = 68 # 68 BPM - normal resting heart rate
   batch_end = batch_start + 10.seconds
   
   samples = []
-  5000.times do |j|
-    time_in_seconds = (i * 10) + (j / 500.0)
+  4000.times do |j|
+    time_in_seconds = (i * 10) + (j / 400.0)
     value = generate_ekg_sample(time_in_seconds, heart_rate)
     samples << value
   end
@@ -485,7 +485,7 @@ heart_rate = 68 # 68 BPM - normal resting heart rate
   ) do |batch|
     batch.start_timestamp = batch_start
     batch.end_timestamp = batch_end
-    batch.sample_rate = 500.0
+    batch.sample_rate = 400.0
     batch.sample_count = samples.size
     batch.data = { samples: samples }
   end
@@ -494,7 +494,7 @@ heart_rate = 68 # 68 BPM - normal resting heart rate
   print "\r  Creating batches: #{batch_count}/180" if batch_count % 10 == 0
 end
 
-recording3.update!(total_samples: batch_count * 5000)
+recording3.update!(total_samples: batch_count * 4000)
 puts "\n  ✅ Created #{batch_count} batches (#{recording3.total_samples} samples)"
 
 puts "✅ Session untuk #{patient3.name} (Completed, not reviewed)"
