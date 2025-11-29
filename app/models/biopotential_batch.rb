@@ -10,7 +10,7 @@ class BiopotentialBatch < ApplicationRecord
   validates :data, presence: true
   validate :validate_data_structure
   validate :end_timestamp_after_start_timestamp
-  # Removed: validate_sample_rate_reasonable - we log warnings instead of rejecting
+  validate :validate_sample_rate_not_corrupted
   
   # Scopes
   scope :ordered, -> { order(:batch_sequence) }
@@ -155,8 +155,26 @@ class BiopotentialBatch < ApplicationRecord
     self.max_value = vals.max
   end
   
-  # Log warning if sample_rate deviates significantly from expected
-  # BUT STILL SAVE THE DATA - never reject data!
+  # Validate sample_rate is not corrupted (reject obviously wrong data)
+  # Accept: 200-600 Hz (reasonable EKG range)
+  # Reject: <200 Hz or >600 Hz (likely timestamp or calculation error)
+  def validate_sample_rate_not_corrupted
+    return unless sample_rate.present?
+    
+    min_reasonable = 200.0  # Minimum for EKG
+    max_reasonable = 600.0  # Maximum reasonable
+    
+    if sample_rate < min_reasonable
+      errors.add(:sample_rate, "is too low (#{sample_rate} Hz). Minimum acceptable is #{min_reasonable} Hz. " \
+                                "This usually means wrong timestamp calculation or too few samples. " \
+                                "Check: duration_seconds=#{duration_seconds}, sample_count=#{sample_count}")
+    elsif sample_rate > max_reasonable
+      errors.add(:sample_rate, "is too high (#{sample_rate} Hz). Maximum acceptable is #{max_reasonable} Hz. " \
+                                "This usually means wrong timestamp calculation or timestamp not in seconds.")
+    end
+  end
+  
+  # Log warning if sample_rate deviates from target but still in reasonable range
   def log_sample_rate_warning
     return unless sample_rate.present?
     
@@ -164,12 +182,13 @@ class BiopotentialBatch < ApplicationRecord
     min_acceptable = target_hz * 0.80  # 320 Hz for 400 Hz target
     max_acceptable = target_hz * 1.20  # 480 Hz for 400 Hz target
     
-    if sample_rate < min_acceptable || sample_rate > max_acceptable
-      Rails.logger.warn "[BiopotentialBatch##{id}] Sample rate warning: " \
-                        "Got #{sample_rate} Hz, expected ~#{target_hz} Hz (±20%). " \
-                        "Acceptable range: #{min_acceptable}-#{max_acceptable} Hz. " \
-                        "Recording##{recording_id}, Batch##{batch_sequence}. " \
-                        "DATA SAVED - this is just a warning."
+    # Only warn if in reasonable range but outside target range
+    if sample_rate >= 200 && sample_rate <= 600
+      if sample_rate < min_acceptable || sample_rate > max_acceptable
+        Rails.logger.warn "[BiopotentialBatch##{id}] Sample rate deviation: " \
+                          "Got #{sample_rate} Hz, expected ~#{target_hz} Hz (±20%). " \
+                          "Recording##{recording_id}, Batch##{batch_sequence}."
+      end
     end
   end
 end
