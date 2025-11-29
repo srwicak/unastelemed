@@ -4,7 +4,7 @@ class Api::RecordingsController < ApplicationController
   # Require authentication for most API endpoints. Keep start/data/stop/show public for device flow.
   # Note: `index` now requires authentication so mobile users can only fetch their own recordings (or doctors).
   before_action :authenticate_request, except: [:show, :start, :data, :stop, :recover_data]
-  before_action :set_recording, only: [:show, :update, :destroy, :chart_data, :complete, :cancel, :add_interpretation, :add_notes, :recover_data]
+  before_action :set_recording, only: [:show, :update, :destroy, :chart_data, :complete, :cancel, :add_interpretation, :add_notes, :recover_data, :force_complete]
   before_action :set_recording_for_stop_and_data, only: [:stop, :data]
   
   def index
@@ -40,6 +40,14 @@ class Api::RecordingsController < ApplicationController
     recordings_scope = recordings_scope.where(status: params[:status]) if params[:status].present?
 
     recordings = recordings_scope.order(created_at: :desc).page(params[:page]).per(params[:per_page] || 20)
+    
+    # Auto-complete any recordings that exceeded max duration (lazy check)
+    recordings.each do |recording|
+      if recording.status == 'recording' && recording.exceeded_max_duration?
+        recording.auto_complete_if_exceeded!
+        recording.reload
+      end
+    end
 
     render json: {
       success: true,
@@ -49,6 +57,12 @@ class Api::RecordingsController < ApplicationController
   end
   
   def show
+    # Auto-complete if exceeded max duration + grace period (lazy check)
+    if @recording.status == 'recording' && @recording.exceeded_max_duration?
+      @recording.auto_complete_if_exceeded!
+      @recording.reload
+    end
+    
     render json: {
       success: true,
       data: {
@@ -316,6 +330,20 @@ class Api::RecordingsController < ApplicationController
       }, status: :not_found
     end
     
+    # Auto-complete if exceeded max duration + grace period
+    if @recording.exceeded_max_duration?
+      @recording.auto_complete_if_exceeded!
+      
+      return render json: {
+        success: false,
+        error: 'Recording sudah melebihi durasi maksimum',
+        message: 'Recording telah otomatis di-complete karena melebihi max_duration + grace period',
+        current_status: @recording.status,
+        max_duration_minutes: @recording.qr_code&.max_duration_minutes,
+        grace_period_minutes: (@recording.calculate_grace_period(@recording.qr_code.duration_in_seconds) / 60).round
+      }, status: :unprocessable_entity
+    end
+    
     unless @recording.status == 'recording'
       return render json: {
         success: false,
@@ -558,6 +586,92 @@ class Api::RecordingsController < ApplicationController
         duplicate_batches: duplicate_batches,
         failed_batches: failed_batches
       }
+    }, status: :ok
+  end
+  
+  # POST /api/recordings/:id/force_complete
+  # Endpoint untuk force complete recording yang stuck (manual recovery)
+  def force_complete
+    unless @recording.status == 'recording'
+      return render json: {
+        success: false,
+        error: 'Recording bukan dalam status recording',
+        current_status: @recording.status
+      }, status: :unprocessable_entity
+    end
+    
+    reason = params[:reason] || 'Manual force complete via API'
+    
+    begin
+      @recording.force_complete!(reason: reason)
+      @recording.reload
+      
+      render json: {
+        success: true,
+        message: 'Recording berhasil di-force complete',
+        data: {
+          recording_id: @recording.id,
+          session_id: @recording.session_id,
+          status: @recording.status,
+          started_at: @recording.start_time,
+          ended_at: @recording.end_time,
+          duration_seconds: @recording.duration_seconds,
+          total_samples: @recording.total_samples,
+          total_batches: @recording.biopotential_batches.count,
+          data_status: @recording.data_status,
+          notes: @recording.notes
+        }
+      }, status: :ok
+    rescue StandardError => e
+      render json: {
+        success: false,
+        error: 'Gagal force complete recording',
+        details: e.message
+      }, status: :internal_server_error
+    end
+  end
+  
+  # GET /api/recordings/stale
+  # Get list of recordings yang stuck dalam status 'recording'
+  def stale
+    # Require authentication
+    unless authenticate_request
+      return render json: { 
+        success: false, 
+        error: 'Unauthorized' 
+      }, status: :unauthorized
+    end
+    
+    threshold_minutes = params[:threshold_minutes]&.to_i || 15
+    stale_recordings = Recording.stale(threshold_minutes)
+    
+    recordings_data = stale_recordings.map do |recording|
+      last_batch = recording.biopotential_batches.order(created_at: :desc).first
+      
+      {
+        id: recording.id,
+        session_id: recording.session_id,
+        status: recording.status,
+        started_at: recording.start_time,
+        duration_since_start_minutes: ((Time.current - recording.start_time) / 60).round,
+        has_batch_data: recording.has_batch_data?,
+        total_batches: recording.biopotential_batches.count,
+        total_samples: recording.total_samples,
+        last_batch_at: last_batch&.created_at,
+        minutes_since_last_batch: last_batch ? ((Time.current - last_batch.created_at) / 60).round : nil,
+        patient: {
+          id: recording.patient_id,
+          name: recording.patient.name,
+          identifier: recording.patient.patient_identifier
+        }
+      }
+    end
+    
+    render json: {
+      success: true,
+      message: "Found #{recordings_data.size} stale recordings",
+      threshold_minutes: threshold_minutes,
+      data: recordings_data
     }, status: :ok
   end
   

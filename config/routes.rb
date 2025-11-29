@@ -31,6 +31,7 @@ Rails.application.routes.draw do
   get 'view_recording/:session_id', to: 'dashboard#view_recording', as: 'view_recording'
   post 'add_interpretation', to: 'dashboard#add_interpretation'
   patch 'complete_session/:id', to: 'dashboard#complete_session', as: 'complete_session'
+  post 'terminate_recording/:session_id', to: 'dashboard#terminate_recording', as: 'terminate_recording'
   
   # Patient management routes
   resources :patients do
@@ -135,11 +136,13 @@ Rails.application.routes.draw do
         put :add_interpretation
         put :add_notes
         post :recover_data  # NEW: endpoint untuk upload data yang tertinggal
+        post :force_complete # NEW: endpoint untuk force complete recording yang stuck
       end
       collection do
         post :start
         post :stop
         post :data
+        get :stale # NEW: list recording yang stuck
       end
       
       # EKG Markers (nested under recordings)

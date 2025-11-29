@@ -168,6 +168,9 @@ class DashboardController < ApplicationController
     # Load batch data instead of individual samples
     @batches = @recording.biopotential_batches.ordered.limit(100) # Limit for performance
     @interpretation = @session&.interpretation_completed? ? @session.doctor_notes : nil
+    
+    # Check permissions untuk stop/terminate
+    @can_terminate = current_user.medical_staff&.doctor? || current_user.medical_staff&.nurse?
   end
 
   def add_interpretation
@@ -197,6 +200,69 @@ class DashboardController < ApplicationController
       redirect_to nurse_dashboard_path, notice: 'Sesi berhasil diselesaikan'
     else
       redirect_to nurse_dashboard_path, alert: 'Gagal menyelesaikan sesi'
+    end
+  end
+  
+  def terminate_recording
+    @recording = Recording.find_by(session_id: params[:session_id])
+    
+    unless @recording
+      respond_to do |format|
+        format.html { redirect_to dashboard_path, alert: 'Recording tidak ditemukan' }
+        format.json { render json: { success: false, error: 'Recording tidak ditemukan' }, status: :not_found }
+      end
+      return
+    end
+    
+    # Check permissions
+    unless current_user.medical_staff&.doctor? || current_user.medical_staff&.nurse?
+      respond_to do |format|
+        format.html { redirect_to dashboard_path, alert: 'Akses ditolak' }
+        format.json { render json: { success: false, error: 'Akses ditolak' }, status: :forbidden }
+      end
+      return
+    end
+    
+    unless @recording.status == 'recording'
+      respond_to do |format|
+        format.html { redirect_to view_recording_path(@recording.session_id), alert: 'Recording tidak dalam status recording' }
+        format.json { render json: { success: false, error: 'Recording tidak dalam status recording', current_status: @recording.status }, status: :unprocessable_entity }
+      end
+      return
+    end
+    
+    # Force complete recording
+    reason = params[:reason] || "Terminated by #{current_user.name} (#{current_user.medical_staff.role}) from web dashboard"
+    
+    begin
+      @recording.force_complete!(reason: reason)
+      @recording.reload
+      
+      respond_to do |format|
+        format.html do
+          redirect_to view_recording_path(@recording.session_id), notice: 'Recording berhasil dihentikan'
+        end
+        format.json do
+          render json: {
+            success: true,
+            message: 'Recording berhasil dihentikan',
+            data: {
+              recording_id: @recording.id,
+              session_id: @recording.session_id,
+              status: @recording.status,
+              ended_at: @recording.end_time,
+              duration_seconds: @recording.duration_seconds,
+              total_samples: @recording.total_samples,
+              total_batches: @recording.biopotential_batches.count
+            }
+          }, status: :ok
+        end
+      end
+    rescue StandardError => e
+      respond_to do |format|
+        format.html { redirect_to view_recording_path(@recording.session_id), alert: "Gagal menghentikan recording: #{e.message}" }
+        format.json { render json: { success: false, error: 'Gagal menghentikan recording', details: e.message }, status: :internal_server_error }
+      end
     end
   end
 

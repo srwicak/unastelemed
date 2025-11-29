@@ -31,6 +31,13 @@ class Recording < ApplicationRecord
   scope :not_reviewed, -> { where(reviewed_by_doctor: false) }
   scope :with_notes, -> { where(has_notes: true) }
   
+  # Find recordings that might be stale (stuck in 'recording' status)
+  scope :stale, -> (threshold_minutes = 15) {
+    recording
+      .where('start_time < ?', threshold_minutes.minutes.ago)
+      .order(start_time: :asc)
+  }
+  
   # Callbacks
   before_validation :set_default_status, on: :create
   after_update :process_data_if_completed, if: :saved_change_to_status?
@@ -144,6 +151,115 @@ class Recording < ApplicationRecord
     else
       "❓ Status data tidak diketahui"
     end
+  end
+  
+  # Check if recording exceeded max duration + grace period
+  def exceeded_max_duration?
+    return false unless status == 'recording'
+    return false unless start_time
+    return false unless qr_code&.duration_in_seconds
+    
+    max_duration = qr_code.duration_in_seconds
+    grace_period = calculate_grace_period(max_duration)
+    total_allowed = max_duration + grace_period
+    
+    elapsed = Time.current - start_time
+    elapsed > total_allowed
+  end
+  
+  # Calculate grace period based on recording duration (proportional)
+  def calculate_grace_period(duration_seconds)
+    case duration_seconds
+    when 0..60          # <= 1 minute: grace = 1 minute
+      60
+    when 61..300        # 1-5 minutes: grace = 1 minute
+      60
+    when 301..600       # 5-10 minutes: grace = 2 minutes
+      120
+    when 601..1800      # 10-30 minutes: grace = 5 minutes
+      300
+    when 1801..3600     # 30-60 minutes: grace = 10 minutes
+      600
+    when 3601..7200     # 1-2 hours: grace = 15 minutes
+      900
+    when 7201..14400    # 2-4 hours: grace = 30 minutes
+      1800
+    else                # > 4 hours: grace = 1 hour
+      3600
+    end
+  end
+  
+  # Check if recording is stale (stuck in 'recording' status for too long)
+  def stale?(threshold_minutes = 15)
+    return false unless status == 'recording'
+    return false unless start_time
+    
+    # Priority 1: Check if exceeded max duration + grace period
+    return true if exceeded_max_duration?
+    
+    # Priority 2: Check if started long time ago with no batch activity
+    started_long_ago = start_time < threshold_minutes.minutes.ago
+    
+    # Check if has recent batch activity
+    if has_batch_data?
+      last_batch = biopotential_batches.order(created_at: :desc).first
+      no_recent_activity = last_batch.created_at < threshold_minutes.minutes.ago
+      return started_long_ago && no_recent_activity
+    end
+    
+    # No batch data and started long ago
+    started_long_ago
+  end
+  
+  # Auto-complete recording if exceeded max duration + grace period
+  def auto_complete_if_exceeded!
+    return false unless exceeded_max_duration?
+    
+    max_duration = qr_code.duration_in_seconds
+    grace_period = calculate_grace_period(max_duration)
+    
+    reason = [
+      "Recording exceeded maximum duration",
+      "Max duration: #{max_duration / 60} minutes",
+      "Grace period: #{grace_period / 60} minutes",
+      "Auto-completed by system"
+    ].join(" | ")
+    
+    force_complete!(reason: reason)
+  end
+  
+  # Force complete a recording (useful for stale recordings)
+  def force_complete!(reason: nil)
+    return false unless status == 'recording'
+    
+    # Determine end_time based on last batch or max_duration
+    end_time = if has_batch_data?
+      last_batch = biopotential_batches.order(end_timestamp: :desc).first
+      last_batch.end_timestamp
+    elsif qr_code&.duration_in_seconds
+      # Use max_duration as end_time if no batch data
+      start_time + qr_code.duration_in_seconds.seconds
+    else
+      start_time + 1.second
+    end
+    
+    duration_seconds = (end_time - start_time).to_i
+    
+    # Build notes
+    completion_note = [
+      "[Force-completed at #{Time.current.iso8601}]",
+      "Reason: #{reason || 'Manual completion or auto-recovery'}",
+      "Data saved up to: #{end_time.iso8601}",
+      "Total batches: #{biopotential_batches.count}",
+      "Total samples: #{total_samples || 0}"
+    ].join("\n")
+    
+    update!(
+      status: 'completed',
+      end_time: end_time,
+      duration_seconds: duration_seconds,
+      notes: [notes, completion_note].compact.join("\n\n")
+    )
   end
   
   private

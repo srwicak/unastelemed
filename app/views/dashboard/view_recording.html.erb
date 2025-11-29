@@ -186,6 +186,17 @@
     <%= link_to "Kembali", :back, class: "btn btn-secondary" %>
     <% if current_user.medical_staff %>
       <%= link_to "Dashboard", dashboard_path, class: "btn btn-outline" %>
+      
+      <% if @can_terminate && @recording.status == 'recording' %>
+        <%= button_to "⏹️ Hentikan Recording", 
+            terminate_recording_path(@recording.session_id), 
+            method: :post,
+            data: { 
+              confirm: "Yakin ingin menghentikan recording ini?\n\nRecording akan ditandai selesai dengan data yang sudah diterima.\n\nTindakan ini tidak dapat dibatalkan." 
+            },
+            class: "btn btn-danger",
+            style: "background: #dc3545; color: white;" %>
+      <% end %>
     <% else %>
       <%= link_to "Dashboard Pasien", patient_dashboard_path, class: "btn btn-outline" %>
     <% end %>
@@ -749,34 +760,34 @@ function updateChartData(result, startTimeMs) {
     return;
   }
   
-  // Merge with existing data instead of replacing
+  // FIXED: Don't merge - REPLACE with new data for requested range
+  // Merging causes overlapping when scrolling back and forth
   const existingData = currentChart.data.datasets[0].data || [];
-  const allData = [...existingData, ...newData];
   
-  // Remove duplicates based on x value (timestamp)
-  const uniqueData = [];
-  const seenX = new Set();
-  for (const point of allData) {
-    const key = Math.round(point.x * 1000); // Round to millisecond precision
-    if (!seenX.has(key)) {
-      seenX.add(key);
-      uniqueData.push(point);
-    }
-  }
+  // Remove data in the new data range to avoid duplicates
+  const newStartX = newData[0].x;
+  const newEndX = newData[newData.length - 1].x;
   
-  // Sort by x (time)
-  uniqueData.sort((a, b) => a.x - b.x);
+  // Keep only data outside the new range
+  const filteredExisting = existingData.filter(point => 
+    point.x < newStartX || point.x > newEndX
+  );
   
-  console.log('After conversion and merge:', {
+  // Combine and sort
+  const allData = [...filteredExisting, ...newData];
+  allData.sort((a, b) => a.x - b.x);
+  
+  console.log('After conversion and replace:', {
     newDataLength: newData.length,
     existingDataLength: existingData.length,
-    mergedLength: uniqueData.length,
-    firstPoint: uniqueData[0],
-    lastPoint: uniqueData[uniqueData.length - 1],
-    sampleMiddle: uniqueData[Math.floor(uniqueData.length / 2)]
+    filteredLength: filteredExisting.length,
+    finalLength: allData.length,
+    newRange: {start: newStartX.toFixed(3), end: newEndX.toFixed(3)},
+    firstPoint: allData[0],
+    lastPoint: allData[allData.length - 1]
   });
   
-  currentChart.data.datasets[0].data = uniqueData;
+  currentChart.data.datasets[0].data = allData;
   currentChart.update('none');
   
   console.log('Chart updated. Total dataset length:', currentChart.data.datasets[0].data.length);
@@ -1710,6 +1721,18 @@ function showNotification(message, type = 'info') {
 
 .btn-success:hover {
   background: #218838;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
 }
 
 /* Modal Styles */
