@@ -50,15 +50,21 @@ class RecordingsController < ApplicationController
     start_time = [start_time, recording_start].max
     end_time = [end_time, recording_end].min
     
+    Rails.logger.info "Data request - Recording: #{@recording.id}, Start: #{start_time}, End: #{end_time}"
+    Rails.logger.info "Recording time range: #{recording_start} to #{recording_end}"
+    
     # Calculate total duration and estimated samples
     duration = end_time - start_time
     
     # Target resolution: ~10000 points for the visible range to preserve EKG peaks
     target_points = 10000
     
+    # Get batches that overlap with the requested time range
     batches = @recording.biopotential_batches
                         .by_time_range(start_time, end_time)
                         .ordered
+    
+    Rails.logger.info "Found #{batches.count} batches for time range"
     
     data = []
     
@@ -66,6 +72,8 @@ class RecordingsController < ApplicationController
     # but for now we load batches.
     
     total_samples_estimate = batches.sum { |b| b.data['samples']&.size || 0 }
+    
+    Rails.logger.info "Total samples estimate: #{total_samples_estimate}"
     
     # Calculate skip factor (1 = take all, 2 = take every 2nd, etc.)
     skip = (total_samples_estimate / target_points.to_f).ceil

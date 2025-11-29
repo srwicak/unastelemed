@@ -553,8 +553,17 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
     const startIso = new Date(startTimeMs).toISOString();
     const endIso = new Date(endTimeMs).toISOString();
     
+    console.log('Fetching data:', {
+      recording_id: RECORDING_ID,
+      start_time: startIso,
+      end_time: endIso,
+      url: `/recordings/${RECORDING_ID}/data?start_time=${startIso}&end_time=${endIso}`
+    });
+    
     const response = await fetch(`/recordings/${RECORDING_ID}/data?start_time=${startIso}&end_time=${endIso}`);
     const result = await response.json();
+    
+    console.log('Received data:', result);
     
     // Cache the result
     dataCache[cacheKey] = result;

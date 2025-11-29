@@ -13,7 +13,9 @@ class BiopotentialBatch < ApplicationRecord
   
   # Scopes
   scope :ordered, -> { order(:batch_sequence) }
-  scope :by_time_range, ->(start_time, end_time) { where('start_timestamp >= ? AND end_timestamp <= ?', start_time, end_time) }
+  # Fixed: Find batches that overlap with the time range (not just those fully contained)
+  # A batch overlaps if: batch_start <= range_end AND batch_end >= range_start
+  scope :by_time_range, ->(start_time, end_time) { where('start_timestamp <= ? AND end_timestamp >= ?', end_time, start_time) }
   scope :recent, -> { order(created_at: :desc) }
   scope :for_recording, ->(recording_id) { where(recording_id: recording_id) }
   
