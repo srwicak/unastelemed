@@ -233,7 +233,14 @@
 // Configuration
 const RECORDING_ID = <%= @recording.id %>;
 const START_TIME = new Date("<%= (@recording.start_time || @recording.created_at).iso8601 %>").getTime();
-const RECORDING_END_TIME = new Date("<%= ((@recording.end_time || @recording.start_time || @recording.created_at) + (@recording.duration_seconds || 0).seconds).iso8601 %>").getTime();
+// For active recordings without end_time, use current time or last batch timestamp
+<% if @recording.end_time %>
+const RECORDING_END_TIME = new Date("<%= @recording.end_time.iso8601 %>").getTime();
+<% elsif @batches.any? %>
+const RECORDING_END_TIME = new Date("<%= @batches.last.end_timestamp.iso8601 %>").getTime();
+<% else %>
+const RECORDING_END_TIME = Date.now(); // Use current time as temporary end
+<% end %>
 const TOTAL_DURATION = RECORDING_END_TIME - START_TIME;
 const INITIAL_WINDOW = 10 * 1000; // 10 seconds
 const BUFFER_SIZE = 20 * 1000; // Keep 20s buffer on each side
