@@ -582,6 +582,14 @@ async function fetchDataBuffered(startTimeMs, endTimeMs) {
 function updateChartData(result, startTimeMs) {
   if (!currentChart) return;
   
+  console.log('updateChartData called with:', {
+    type: result.type,
+    dataLength: result.data?.length,
+    firstPoint: result.data?.[0],
+    lastPoint: result.data?.[result.data.length - 1],
+    START_TIME: START_TIME
+  });
+  
   let newData = [];
   
   if (result.type === 'empty') {
@@ -604,8 +612,17 @@ function updateChartData(result, startTimeMs) {
     newData.sort((a, b) => a.x - b.x);
   }
   
+  console.log('After conversion:', {
+    newDataLength: newData.length,
+    firstConverted: newData[0],
+    lastConverted: newData[newData.length - 1],
+    sampleMiddle: newData[Math.floor(newData.length / 2)]
+  });
+  
   currentChart.data.datasets[0].data = newData;
   currentChart.update('none');
+  
+  console.log('Chart updated. Dataset length:', currentChart.data.datasets[0].data.length);
 }
 
 function toggleAnnotationMode() {
