@@ -29,6 +29,7 @@ class User < ApplicationRecord
   # Callbacks
   before_save :downcase_email
   before_validation :generate_patient_identifier, on: :create
+  before_validation :sync_patient_name, if: :patient?
   
   def patient?
     role == 'patient'
@@ -86,6 +87,12 @@ class User < ApplicationRecord
     self.patient_identifier = loop do
       candidate = Nanoid.generate(size: 12)
       break candidate unless User.exists?(patient_identifier: candidate)
+    end
+  end
+  
+  def sync_patient_name
+    if patient.present? && name.present?
+      patient.name = name
     end
   end
 end
