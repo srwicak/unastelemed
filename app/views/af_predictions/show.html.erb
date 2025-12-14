@@ -1,0 +1,651 @@
+<div class="af-report-container">
+  <!-- Header -->
+  <div class="af-report-header">
+    <div class="header-left">
+      <h1>🫀 AF Prediction Report</h1>
+      <p class="subtitle">Atrial Fibrillation Analysis</p>
+    </div>
+    <div class="header-right">
+      <% if @af_detected %>
+        <div class="status-badge af-detected">
+          <span class="status-icon">⚠️</span>
+          <span class="status-text">AF TERDETEKSI</span>
+        </div>
+      <% else %>
+        <div class="status-badge normal">
+          <span class="status-icon">✅</span>
+          <span class="status-text">TIDAK ADA AF</span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Patient Info -->
+  <div class="patient-info-card">
+    <div class="info-row">
+      <div class="info-item">
+        <label>Pasien</label>
+        <span><%= @patient.name %></span>
+      </div>
+      <div class="info-item">
+        <label>Tanggal Rekaman</label>
+        <span><%= @recording.created_at.strftime('%d %B %Y %H:%M') %></span>
+      </div>
+      <div class="info-item">
+        <label>Durasi Analisis</label>
+        <span><%= @summary[:total_analyzed_minutes] || 0 %> menit</span>
+      </div>
+      <% if @session&.qr_code %>
+        <div class="info-item">
+          <label>Session ID</label>
+          <span><%= @session.qr_code.code %></span>
+        </div>
+      <% end %>
+    </div>
+    
+    <!-- Prediction Metadata -->
+    <% if @predicted_at %>
+      <div class="prediction-meta" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+        <div class="info-row">
+          <div class="info-item">
+            <label>📅 Diprediksi pada</label>
+            <span><%= @predicted_at.strftime('%d %B %Y %H:%M:%S') %></span>
+          </div>
+          <% if @predicted_by %>
+            <div class="info-item">
+              <label>👤 Oleh</label>
+              <span><%= @predicted_by.name %></span>
+            </div>
+          <% end %>
+          <div class="info-item">
+            <label>💾 Status</label>
+            <span style="color: #28a745;">✓ Tersimpan di Database</span>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <!-- Analyzed Time -->
+    <div class="summary-card">
+      <div class="card-icon">⏱️</div>
+      <div class="card-content">
+        <div class="card-label">Total Analyzed</div>
+        <div class="card-value"><%= @summary[:total_analyzed_minutes] || 0 %></div>
+        <div class="card-unit">menit</div>
+      </div>
+    </div>
+
+    <!-- Normal Rhythm -->
+    <div class="summary-card normal">
+      <div class="card-icon">💚</div>
+      <div class="card-content">
+        <div class="card-label">Normal Rhythm</div>
+        <div class="card-value"><%= @summary[:normal_rhythm_minutes] || 0 %></div>
+        <div class="card-unit">menit</div>
+      </div>
+    </div>
+
+    <!-- AF Time -->
+    <div class="summary-card <%= @af_detected ? 'warning' : '' %>">
+      <div class="card-icon">⚡</div>
+      <div class="card-content">
+        <div class="card-label">Atrial Fibrillation</div>
+        <div class="card-value"><%= @summary[:af_minutes] || 0 %></div>
+        <div class="card-unit">menit (<%= @af_burden %>%)</div>
+      </div>
+    </div>
+
+    <!-- AF Events -->
+    <div class="summary-card <%= @af_count > 0 ? 'warning' : '' %>">
+      <div class="card-icon">📊</div>
+      <div class="card-content">
+        <div class="card-label">AF Episodes</div>
+        <div class="card-value"><%= @af_count %></div>
+        <div class="card-unit">kejadian</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Heart Rate Section -->
+  <div class="hr-section">
+    <h2>❤️ Heart Rate Analysis</h2>
+    <div class="hr-grid">
+      <div class="hr-card min">
+        <div class="hr-label">Minimum</div>
+        <div class="hr-value"><%= @heart_rate[:min_bpm] || 0 %></div>
+        <div class="hr-unit">BPM</div>
+      </div>
+      <div class="hr-card avg">
+        <div class="hr-label">Average</div>
+        <div class="hr-value"><%= @heart_rate[:avg_bpm] || 0 %></div>
+        <div class="hr-unit">BPM</div>
+      </div>
+      <div class="hr-card max">
+        <div class="hr-label">Maximum</div>
+        <div class="hr-value"><%= @heart_rate[:max_bpm] || 0 %></div>
+        <div class="hr-unit">BPM</div>
+      </div>
+    </div>
+
+    <% if @hrv_metrics.present? %>
+      <div class="hrv-metrics">
+        <h3>HRV Metrics</h3>
+        <div class="hrv-grid">
+          <div class="hrv-item">
+            <label>Mean RR</label>
+            <span><%= @hrv_metrics[:mean_rr_ms] || 0 %> ms</span>
+          </div>
+          <div class="hrv-item">
+            <label>SDNN</label>
+            <span><%= @hrv_metrics[:sdnn_ms] || 0 %> ms</span>
+          </div>
+          <div class="hrv-item">
+            <label>RMSSD</label>
+            <span><%= @hrv_metrics[:rmssd_ms] || 0 %> ms</span>
+          </div>
+          <div class="hrv-item">
+            <label>pNN50</label>
+            <span><%= @hrv_metrics[:pnn50_percent] || 0 %>%</span>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- AF Events Table -->
+  <% if @result[:af_events].present? && @result[:af_events].any? %>
+    <div class="af-events-section">
+      <h2>⚡ AF Episode Details</h2>
+      <table class="af-events-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Waktu Mulai</th>
+            <th>Waktu Selesai</th>
+            <th>Durasi</th>
+            <th>Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @result[:af_events].each_with_index do |event, index| %>
+            <tr class="<%= event[:confidence] >= 0.8 ? 'high-confidence' : '' %>">
+              <td><%= index + 1 %></td>
+              <td><%= event[:formatted_start] %></td>
+              <td><%= event[:formatted_end] %></td>
+              <td><%= event[:formatted_duration] %></td>
+              <td>
+                <div class="confidence-bar">
+                  <div class="confidence-fill" style="width: <%= (event[:confidence] * 100).round %>%"></div>
+                  <span class="confidence-text"><%= (event[:confidence] * 100).round %>%</span>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <!-- Conclusion -->
+  <div class="conclusion-section">
+    <h2>📋 Kesimpulan</h2>
+    <div class="conclusion-content">
+      <pre><%= @result[:conclusion] %></pre>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer-section">
+    <div class="disclaimer-icon">⚠️</div>
+    <div class="disclaimer-text">
+      <strong>PENTING:</strong> Hasil analisis ini dihasilkan oleh sistem AI (CNN-LSTM) 
+      dan merupakan alat bantu prediksi, BUKAN diagnosis medis. Semua temuan harus 
+      dikonfirmasi oleh dokter spesialis jantung sebelum pengambilan keputusan klinis.
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="report-actions">
+    <%= link_to "← Kembali ke Rekaman", view_recording_path(@recording.session_id), class: "btn btn-secondary" %>
+    <button onclick="window.print()" class="btn btn-outline">🖨️ Cetak Laporan</button>
+    
+    <% if current_user.medical_staff %>
+      <%= button_to "🔄 Prediksi Ulang", af_repredict_path(@recording.session_id), 
+          method: :post,
+          form: { 
+            data: { 
+              turbo_confirm: "⚠️ PERINGATAN: Prediksi Ulang\n\nAnda yakin ingin menjalankan prediksi ulang?\n\n• Hasil prediksi sebelumnya akan DIHAPUS\n• Proses ini membutuhkan waktu dan compute resource\n• Hasil baru akan menggantikan hasil lama\n\nLanjutkan?" 
+            } 
+          },
+          class: "btn btn-warning",
+          style: "background: #fd7e14; color: white;" %>
+    <% end %>
+    
+    <%= link_to "Dashboard", dashboard_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<style>
+  .af-report-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  }
+
+  /* Header */
+  .af-report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e9ecef;
+  }
+
+  .af-report-header h1 {
+    font-size: 28px;
+    margin: 0;
+    color: #333;
+  }
+
+  .af-report-header .subtitle {
+    color: #666;
+    margin: 5px 0 0;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+  }
+
+  .status-badge.af-detected {
+    background: #fff3cd;
+    color: #856404;
+    border: 2px solid #ffc107;
+  }
+
+  .status-badge.normal {
+    background: #d4edda;
+    color: #155724;
+    border: 2px solid #28a745;
+  }
+
+  .status-icon {
+    font-size: 24px;
+  }
+
+  /* Patient Info */
+  .patient-info-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+  }
+
+  .info-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .info-item label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+  }
+
+  .info-item span {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  /* Summary Grid */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+
+  .summary-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: transform 0.2s;
+  }
+
+  .summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  .summary-card.warning {
+    border-color: #ffc107;
+    background: #fffbeb;
+  }
+
+  .summary-card.normal {
+    border-color: #28a745;
+    background: #f0fff4;
+  }
+
+  .card-icon {
+    font-size: 36px;
+  }
+
+  .card-label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+  }
+
+  .card-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .card-unit {
+    font-size: 14px;
+    color: #666;
+  }
+
+  /* Heart Rate Section */
+  .hr-section {
+    background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    border: 1px solid #ffcdd2;
+  }
+
+  .hr-section h2 {
+    margin: 0 0 20px;
+    color: #c62828;
+  }
+
+  .hr-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .hr-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .hr-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  .hr-value {
+    font-size: 48px;
+    font-weight: bold;
+  }
+
+  .hr-card.min .hr-value { color: #2196f3; }
+  .hr-card.avg .hr-value { color: #4caf50; }
+  .hr-card.max .hr-value { color: #f44336; }
+
+  .hr-unit {
+    font-size: 14px;
+    color: #666;
+  }
+
+  .hrv-metrics {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ffcdd2;
+  }
+
+  .hrv-metrics h3 {
+    font-size: 16px;
+    margin: 0 0 15px;
+    color: #666;
+  }
+
+  .hrv-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+  }
+
+  .hrv-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .hrv-item label {
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+  }
+
+  .hrv-item span {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  /* AF Events Table */
+  .af-events-section {
+    margin-bottom: 30px;
+  }
+
+  .af-events-section h2 {
+    margin: 0 0 15px;
+  }
+
+  .af-events-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .af-events-table th {
+    background: #333;
+    color: white;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+  }
+
+  .af-events-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .af-events-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .af-events-table tr.high-confidence {
+    background: #fff8e1;
+  }
+
+  .confidence-bar {
+    position: relative;
+    height: 24px;
+    background: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    min-width: 100px;
+  }
+
+  .confidence-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #ffc107, #ff9800);
+    border-radius: 12px;
+  }
+
+  .confidence-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+  }
+
+  /* Conclusion */
+  .conclusion-section {
+    margin-bottom: 30px;
+  }
+
+  .conclusion-section h2 {
+    margin: 0 0 15px;
+  }
+
+  .conclusion-content {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    border-left: 4px solid #007bff;
+  }
+
+  .conclusion-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+  }
+
+  /* Disclaimer */
+  .disclaimer-section {
+    display: flex;
+    gap: 15px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+  }
+
+  .disclaimer-icon {
+    font-size: 32px;
+  }
+
+  .disclaimer-text {
+    font-size: 14px;
+    color: #856404;
+    line-height: 1.6;
+  }
+
+  /* Actions */
+  .report-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+  }
+
+  .btn {
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #007bff;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #0056b3;
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #545b62;
+  }
+
+  .btn-outline {
+    background: white;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .btn-outline:hover {
+    background: #f8f9fa;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .summary-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hr-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .hrv-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .af-report-header {
+      flex-direction: column;
+      gap: 15px;
+      text-align: center;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    .report-actions {
+      display: none;
+    }
+
+    .af-report-container {
+      padding: 0;
+    }
+
+    .summary-card:hover,
+    .hr-card:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+</style>

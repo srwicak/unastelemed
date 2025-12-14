@@ -197,6 +197,12 @@
             class: "btn btn-danger",
             style: "background: #dc3545; color: white;" %>
       <% end %>
+      
+      <% if @batches.any? && @recording.status == 'completed' %>
+        <%= link_to "🫀 Prediksi AF", af_prediction_path(@recording.session_id), 
+            class: "btn btn-warning",
+            style: "background: #ffc107; color: #333; font-weight: bold;" %>
+      <% end %>
     <% else %>
       <%= link_to "Dashboard Pasien", patient_dashboard_path, class: "btn btn-outline" %>
     <% end %>
