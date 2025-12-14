@@ -13,7 +13,7 @@ gem "puma", ">= 5.0"
 gem "bcrypt", "~> 3.1.7"
 
 # JWT for API authentication
-gem "jwt", "~> 2.7"
+gem "jwt", "~> 3.1"
 
 # QR Code generation
 gem "rqrcode", "~> 2.2"
