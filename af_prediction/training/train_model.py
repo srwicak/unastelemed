@@ -94,7 +94,7 @@ def create_class_weights(y_train):
 
 
 def train_model():
-    """Train the CNN-LSTM model"""
+    """Train the CNN-LSTM model with Resume Support"""
     print("=" * 60)
     print("Training CNN-LSTM AF Detection Model")
     print("=" * 60)
@@ -102,8 +102,16 @@ def train_model():
     # Create model directory
     os.makedirs(MODEL_DIR, exist_ok=True)
     
+    # Checkpoint paths
+    checkpoint_path = os.path.join(MODEL_DIR, 'af_cnn_lstm_checkpoint.keras')
+    history_path = os.path.join(MODEL_DIR, 'training_history.pkl')
+    
     # Load preprocessed data
     print("\nLoading preprocessed data...")
+    if not os.path.exists(os.path.join(DATA_DIR, 'X_train.npy')):
+        print("Data not found! Please run preprocess.py first.")
+        return None, None
+
     X_train = np.load(os.path.join(DATA_DIR, 'X_train.npy'))
     y_train = np.load(os.path.join(DATA_DIR, 'y_train.npy'))
     X_val = np.load(os.path.join(DATA_DIR, 'X_val.npy'))
@@ -111,13 +119,38 @@ def train_model():
     
     print(f"Training samples: {len(X_train)}")
     print(f"Validation samples: {len(X_val)}")
-    print(f"AF ratio (train): {np.mean(y_train):.2%}")
     
-    # Build model
-    print("\nBuilding CNN-LSTM model...")
-    model = build_cnn_lstm_model()
+    # Determine initial epoch and load model if checkpoint exists
+    initial_epoch = 0
+    previous_history = {}
     
-    # Compile
+    if os.path.exists(checkpoint_path):
+        print(f"\nFound existing checkpoint: {checkpoint_path}")
+        try:
+            print("Resuming training from checkpoint...")
+            model = keras.models.load_model(checkpoint_path)
+            
+            # Try to recover last epoch from history file
+            if os.path.exists(history_path):
+                with open(history_path, 'rb') as f:
+                    previous_history = pickle.load(f)
+                    # Infer last epoch from history length
+                    if 'loss' in previous_history:
+                        initial_epoch = len(previous_history['loss'])
+                        print(f"Resuming from epoch {initial_epoch + 1}")
+            else:
+                print("Warning: History file not found, creating new training session but keeping model weights.")
+                
+        except Exception as e:
+            print(f"Error loading checkpoint: {e}")
+            print("Starting fresh training...")
+            model = build_cnn_lstm_model()
+    else:
+        print("\nBuilding new CNN-LSTM model...")
+        model = build_cnn_lstm_model()
+    
+    # Compile (Re-compile is safer to ensure optimizer state matches if starting fresh)
+    # If resuming, load_model usually preserves optimizer state, but we ensure metrics are set
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         loss='binary_crossentropy',
@@ -129,27 +162,37 @@ def train_model():
         ]
     )
     
-    print("\nModel Summary:")
-    model.summary()
+    if initial_epoch == 0:
+        print("\nModel Summary:")
+        model.summary()
     
     # Calculate class weights
     class_weights = create_class_weights(y_train)
-    print(f"\nClass weights: {class_weights}")
     
     # Callbacks
     callback_list = [
-        callbacks.EarlyStopping(
+        # Save every epoch to allow resuming
+        callbacks.ModelCheckpoint(
+            checkpoint_path,
             monitor='val_auc',
-            patience=10,
-            mode='max',
-            restore_best_weights=True,
-            verbose=1
+            verbose=1,
+            save_best_only=False, # Save every epoch (overwriting) for resume capability
+            save_weights_only=False,
+            mode='auto'
         ),
+        # Also keep a separate file for the absolute best model
         callbacks.ModelCheckpoint(
             os.path.join(MODEL_DIR, 'af_cnn_lstm_best.keras'),
             monitor='val_auc',
             mode='max',
             save_best_only=True,
+            verbose=0
+        ),
+        callbacks.EarlyStopping(
+            monitor='val_auc',
+            patience=10,
+            mode='max',
+            restore_best_weights=True,
             verbose=1
         ),
         callbacks.ReduceLROnPlateau(
@@ -159,63 +202,88 @@ def train_model():
             min_lr=1e-6,
             verbose=1
         ),
-        callbacks.TensorBoard(
-            log_dir=os.path.join(MODEL_DIR, 'logs'),
-            histogram_freq=1
+        # Custom callback to save history after every epoch
+        callbacks.LambdaCallback(
+            on_epoch_end=lambda epoch, logs: save_history(history_path, logs, previous_history)
         )
     ]
     
-    # Train
-    print("\n" + "-" * 60)
-    print("Starting training...")
-    print("-" * 60)
-    
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=50,
-        batch_size=32,
-        class_weight=class_weights,
-        callbacks=callback_list,
-        verbose=1
-    )
-    
-    # Save final model
-    model_path = os.path.join(MODEL_DIR, 'af_cnn_lstm.keras')
-    model.save(model_path)
-    print(f"\n✓ Model saved: {model_path}")
-    
-    # Save training history
-    history_path = os.path.join(MODEL_DIR, 'training_history.pkl')
-    with open(history_path, 'wb') as f:
-        pickle.dump(history.history, f)
-    print(f"✓ Training history saved: {history_path}")
-    
-    # Save model config for documentation
-    config = {
-        'window_size': WINDOW_SIZE,
-        'sample_rate': 250,
-        'num_features': NUM_FEATURES,
-        'architecture': 'CNN-LSTM',
-        'input_shape': (WINDOW_SIZE, NUM_FEATURES),
-        'cnn_layers': [32, 64, 128],
-        'lstm_layers': [64, 32],
-        'dropout': 0.5,
-        'optimizer': 'Adam',
-        'learning_rate': 0.001,
-        'loss': 'binary_crossentropy'
-    }
-    
-    config_path = os.path.join(MODEL_DIR, 'model_config.pkl')
-    with open(config_path, 'wb') as f:
-        pickle.dump(config, f)
-    print(f"✓ Model config saved: {config_path}")
+    try:
+        print("\n" + "-" * 60)
+        print(f"Starting/Resuming training (Epoch {initial_epoch+1}/50)...")
+        print("Press Ctrl+C to stop training safely (checkpoint will be preserved)")
+        print("-" * 60)
+        
+        history = model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            initial_epoch=initial_epoch,
+            epochs=50,
+            batch_size=32,
+            class_weight=class_weights,
+            callbacks=callback_list,
+            verbose=1
+        )
+        
+        # Save final model properly if finished
+        final_path = os.path.join(MODEL_DIR, 'af_cnn_lstm.keras')
+        model.save(final_path)
+        print(f"\n✓ Training finished. Model saved: {final_path}")
+        
+    except KeyboardInterrupt:
+        print("\n\n[Warning] Training interrupted by user!")
+        print(f"Last checkpoint saved at: {checkpoint_path}")
+        print("You can run this script again to RESUME from the last epoch.")
+        return model, None
+
+    # Save final config
+    save_model_config(WINDOW_SIZE, NUM_FEATURES, MODEL_DIR)
     
     print("\n" + "=" * 60)
     print("Training complete!")
     print("=" * 60)
     
     return model, history
+
+def save_history(path, logs, previous_history):
+    """Helper to append and save history incrementally"""
+    if not os.path.exists(path) and not previous_history:
+        # First time
+        current_history = {k: [v] for k, v in logs.items()}
+    else:
+        # Load or use existing memory
+        if previous_history:
+            current_history = previous_history
+        elif os.path.exists(path):
+            with open(path, 'rb') as f:
+                current_history = pickle.load(f)
+        else:
+             current_history = {k: [] for k in logs.items()}
+
+        # Append new logs
+        for k, v in logs.items():
+            if k not in current_history:
+                current_history[k] = []
+            current_history[k].append(v)
+            
+    # Save back to file
+    with open(path, 'wb') as f:
+        pickle.dump(current_history, f)
+        
+    # Update reference
+    previous_history.update(current_history)
+
+def save_model_config(window_size, num_features, model_dir):
+    config = {
+        'window_size': window_size,
+        'sample_rate': 250,
+        'num_features': num_features,
+        'architecture': 'CNN-LSTM',
+        'optimizer': 'Adam',
+        'loss': 'binary_crossentropy'
+    }
+    with open(os.path.join(model_dir, 'model_config.pkl'), 'wb') as f:
+        pickle.dump(config, f)
 
 
 if __name__ == '__main__':

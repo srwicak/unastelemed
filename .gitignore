@@ -31,3 +31,10 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
+
+# AF Prediction backend artifacts
+af_prediction/venv/
+af_prediction/data/
+af_prediction/models/trained/
+**/__pycache__/
+*.py[cod]

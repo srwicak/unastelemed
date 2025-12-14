@@ -25,7 +25,7 @@ class CreateAfPredictions < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :af_predictions, :recording_id
+
     add_index :af_predictions, :predicted_at
     add_index :af_predictions, :af_detected
   end
