@@ -100,8 +100,16 @@ def predict_af():
             }), 400
         
         samples = data.get('samples')
-        sample_rate = data.get('sample_rate', 400)
-        threshold = data.get('threshold', 0.5)
+        
+        # Ensure numeric parameters are safely casted
+        try:
+            sample_rate = int(data.get('sample_rate', 400))
+            threshold = float(data.get('threshold', 0.5))
+        except (ValueError, TypeError):
+             return jsonify({
+                'status': 'error',
+                'message': 'Invalid format for sample_rate or threshold (must be numbers)'
+            }), 400
         
         if samples is None:
             return jsonify({
