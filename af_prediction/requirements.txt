@@ -9,9 +9,9 @@ gunicorn
 # TensorFlow will automatically install compatible keras version
 # On Mac M-series, this will install tensorflow-macos
 # Deep Learning
-# Standard tensorflow works on Linux/VPS
-# For Mac M-series local training, please install tensorflow-metal manually
-tensorflow>=2.15.0
+# Force version 2.15.0/2.15.1 to match Mac training environment
+# This prevents Keras 2 vs 3 serialization issues
+tensorflow==2.15.1
 
 # Signal Processing
 numpy
