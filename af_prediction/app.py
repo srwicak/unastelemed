@@ -14,6 +14,11 @@ Usage:
 
 import os
 import sys
+
+# FORCE LEGACY KERAS (IMPORTANT for TF 2.16+ loading models from TF 2.15)
+# This must be set before importing tensorflow/keras
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
