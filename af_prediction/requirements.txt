@@ -9,9 +9,10 @@ gunicorn
 # TensorFlow will automatically install compatible keras version
 # On Mac M-series, this will install tensorflow-macos
 # Deep Learning
-# Force version 2.15.0/2.15.1 to match Mac training environment
-# This prevents Keras 2 vs 3 serialization issues
-tensorflow==2.15.1
+# VPS has Python 3.12, which requires TensorFlow 2.16+
+tensorflow
+# Install legacy Keras interface for backward compatibility with 2.15 models
+tf-keras
 
 # Signal Processing
 numpy
