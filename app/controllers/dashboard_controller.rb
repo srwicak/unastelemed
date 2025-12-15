@@ -1,17 +1,17 @@
 class DashboardController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_medical_staff, only: [:doctor_dashboard, :nurse_dashboard]
-  before_action :set_patient, only: [:patient_dashboard]
+  before_action :set_medical_staff, only: [ :doctor_dashboard, :nurse_dashboard ]
+  before_action :set_patient, only: [ :patient_dashboard ]
 
   def index
     if current_user&.medical_staff
       case current_user.medical_staff.role
-      when 'doctor'
+      when "doctor"
         redirect_to doctor_dashboard_path
-      when 'nurse'
+      when "nurse"
         redirect_to nurse_dashboard_path
       else
-        redirect_to root_path, alert: 'Role tidak dikenali'
+        redirect_to root_path, alert: "Role tidak dikenali"
       end
     elsif current_user&.patient
       redirect_to patient_dashboard_path
@@ -20,7 +20,7 @@ class DashboardController < ApplicationController
     elsif current_user&.superuser?
       redirect_to superuser_dashboard_path
     else
-      redirect_to root_path, alert: 'Akses ditolak'
+      redirect_to root_path, alert: "Akses ditolak"
     end
   end
 
@@ -33,7 +33,7 @@ class DashboardController < ApplicationController
     @pending_sessions = RecordingSession.includes(:patient, :qr_code)
                                        .where(interpretation_completed: false)
                                        .order(created_at: :desc)
-                                       .limit(10)
+                                       .page(params[:page]).per(10)
 
     @patients_count = Patient.count
     @sessions_count = RecordingSession.count
@@ -47,18 +47,18 @@ class DashboardController < ApplicationController
 
   def nurse_dashboard
     @active_sessions = RecordingSession.includes(:patient, :qr_code)
-                                      .where(status: 'active')
+                                      .where(status: "active")
                                       .order(created_at: :desc)
 
     @completed_sessions = RecordingSession.includes(:patient, :qr_code)
-                                       .where(status: 'completed')
+                                       .where(status: "completed")
                                        .order(created_at: :desc)
                                        .limit(10)
 
     @patients = Patient.order(name: :asc)
-    
+
     @today_sessions = RecordingSession.where(created_at: Date.current.all_day).count
-    @active_count = RecordingSession.where(status: 'active').count
+    @active_count = RecordingSession.where(status: "active").count
   end
 
   def patient_dashboard
@@ -66,11 +66,11 @@ class DashboardController < ApplicationController
                                 .where(patient: current_user.patient)
                                 .order(created_at: :desc)
 
-    @completed_sessions = @my_sessions.where(status: 'completed')
+    @completed_sessions = @my_sessions.where(status: "completed")
                                    .where.not(interpretation_completed: false)
                                    .limit(5)
 
-    @pending_sessions = @my_sessions.where(status: 'active')
+    @pending_sessions = @my_sessions.where(status: "active")
                                    .or(@my_sessions.where(interpretation_completed: false))
 
     @latest_interpretation = @my_sessions.where.not(doctor_notes: nil)
@@ -80,7 +80,7 @@ class DashboardController < ApplicationController
 
   def hospital_manager_dashboard
     unless current_user&.hospital_manager?
-      redirect_to root_path, alert: 'Akses ditolak'
+      redirect_to root_path, alert: "Akses ditolak"
       return
     end
 
@@ -88,51 +88,51 @@ class DashboardController < ApplicationController
     @total_nurses = User.nurses.count
     @total_patients = Patient.count
     @total_sessions = RecordingSession.count
-    
-    @recent_staff = User.where(role: ['doctor', 'nurse'])
+
+    @recent_staff = User.where(role: [ "doctor", "nurse" ])
                         .order(created_at: :desc)
                         .limit(5)
-    
+
     @recent_sessions = RecordingSession.includes(:patient, :medical_staff)
                                       .order(created_at: :desc)
                                       .limit(10)
-    
+
     @hospitals = Hospital.includes(:users).all
   end
 
   def superuser_dashboard
     unless current_user&.superuser?
-      redirect_to root_path, alert: 'Akses ditolak'
+      redirect_to root_path, alert: "Akses ditolak"
       return
     end
 
     @total_hospitals = Hospital.count
     @total_users = User.count
     @total_managers = User.hospital_managers.count
-    @total_staff = User.where(role: ['doctor', 'nurse']).count
-    
+    @total_staff = User.where(role: [ "doctor", "nurse" ]).count
+
     @recent_users = User.order(created_at: :desc).limit(10)
     @recent_hospitals = Hospital.order(created_at: :desc).limit(5)
   end
 
   def create_session
     @session = RecordingSession.new(session_params)
-    @session.status = 'active'
+    @session.status = "active"
     @session.started_at = Time.current
-    
+
     if @session.save
       # Dapatkan patient dari session
       patient = @session.patient
-      
+
       # Get QR code parameters from form
-      max_duration_minutes = if params[:qr_code][:max_duration_minutes] == 'custom'
+      max_duration_minutes = if params[:qr_code][:max_duration_minutes] == "custom"
                                params[:qr_code][:custom_duration_minutes].to_i
-                             else
+      else
                                params[:qr_code][:max_duration_minutes].to_i
-                             end
-      
+      end
+
       valid_hours = params[:qr_code][:valid_hours].to_f
-      
+
       @qr_code = QrCode.create!(
         code: SecureRandom.hex(16),
         recording_session: @session,
@@ -144,108 +144,108 @@ class DashboardController < ApplicationController
         max_duration_minutes: max_duration_minutes,
         is_used: false
       )
-      
-      redirect_to nurse_dashboard_path, notice: 'Sesi pemeriksaan berhasil dibuat'
+
+      redirect_to nurse_dashboard_path, notice: "Sesi pemeriksaan berhasil dibuat"
     else
-      redirect_to nurse_dashboard_path, alert: 'Gagal membuat sesi: ' + @session.errors.full_messages.join(', ')
+      redirect_to nurse_dashboard_path, alert: "Gagal membuat sesi: " + @session.errors.full_messages.join(", ")
     end
   end
 
   def view_recording
     @recording = Recording.find_by(session_id: params[:session_id])
-    
+
     unless @recording
-      redirect_to dashboard_path, alert: 'Recording tidak ditemukan'
+      redirect_to dashboard_path, alert: "Recording tidak ditemukan"
       return
     end
     @session = @recording.recording_session
-    
+
     unless can_access_recording?(@recording)
-      redirect_to dashboard_path, alert: 'Akses ditolak'
+      redirect_to dashboard_path, alert: "Akses ditolak"
       return
     end
 
     # Load batch data instead of individual samples
     @batches = @recording.biopotential_batches.ordered.limit(100) # Limit for performance
     @interpretation = @session&.interpretation_completed? ? @session.doctor_notes : nil
-    
+
     # Check permissions untuk stop/terminate
     @can_terminate = current_user.medical_staff&.doctor? || current_user.medical_staff&.nurse?
   end
 
   def add_interpretation
     @session = RecordingSession.find(params[:id])
-    
+
     unless current_user.medical_staff&.doctor?
-      redirect_to dashboard_path, alert: 'Hanya dokter yang dapat menambahkan interpretasi'
+      redirect_to dashboard_path, alert: "Hanya dokter yang dapat menambahkan interpretasi"
       return
     end
 
     if @session.update(interpretation_params.merge(interpretation_completed: true))
-      redirect_to doctor_dashboard_path, notice: 'Interpretasi berhasil ditambahkan'
+      redirect_to doctor_dashboard_path, notice: "Interpretasi berhasil ditambahkan"
     else
-      redirect_to doctor_dashboard_path, alert: 'Gagal menambahkan interpretasi'
+      redirect_to doctor_dashboard_path, alert: "Gagal menambahkan interpretasi"
     end
   end
 
   def complete_session
     @session = RecordingSession.find(params[:id])
-    
+
     unless current_user.medical_staff&.nurse?
-      redirect_to dashboard_path, alert: 'Hanya perawat yang dapat menyelesaikan sesi'
+      redirect_to dashboard_path, alert: "Hanya perawat yang dapat menyelesaikan sesi"
       return
     end
 
-    if @session.update(status: 'completed')
-      redirect_to nurse_dashboard_path, notice: 'Sesi berhasil diselesaikan'
+    if @session.update(status: "completed")
+      redirect_to nurse_dashboard_path, notice: "Sesi berhasil diselesaikan"
     else
-      redirect_to nurse_dashboard_path, alert: 'Gagal menyelesaikan sesi'
+      redirect_to nurse_dashboard_path, alert: "Gagal menyelesaikan sesi"
     end
   end
-  
+
   def terminate_recording
     @recording = Recording.find_by(session_id: params[:session_id])
-    
+
     unless @recording
       respond_to do |format|
-        format.html { redirect_to dashboard_path, alert: 'Recording tidak ditemukan' }
-        format.json { render json: { success: false, error: 'Recording tidak ditemukan' }, status: :not_found }
+        format.html { redirect_to dashboard_path, alert: "Recording tidak ditemukan" }
+        format.json { render json: { success: false, error: "Recording tidak ditemukan" }, status: :not_found }
       end
       return
     end
-    
+
     # Check permissions
     unless current_user.medical_staff&.doctor? || current_user.medical_staff&.nurse?
       respond_to do |format|
-        format.html { redirect_to dashboard_path, alert: 'Akses ditolak' }
-        format.json { render json: { success: false, error: 'Akses ditolak' }, status: :forbidden }
+        format.html { redirect_to dashboard_path, alert: "Akses ditolak" }
+        format.json { render json: { success: false, error: "Akses ditolak" }, status: :forbidden }
       end
       return
     end
-    
-    unless @recording.status == 'recording'
+
+    unless @recording.status == "recording"
       respond_to do |format|
-        format.html { redirect_to view_recording_path(@recording.session_id), alert: 'Recording tidak dalam status recording' }
-        format.json { render json: { success: false, error: 'Recording tidak dalam status recording', current_status: @recording.status }, status: :unprocessable_entity }
+        format.html { redirect_to view_recording_path(@recording.session_id), alert: "Recording tidak dalam status recording" }
+        format.json { render json: { success: false, error: "Recording tidak dalam status recording", current_status: @recording.status }, status: :unprocessable_entity }
       end
       return
     end
-    
+
     # Force complete recording
     reason = params[:reason] || "Terminated by #{current_user.name} (#{current_user.medical_staff.role}) from web dashboard"
-    
+
     begin
       @recording.force_complete!(reason: reason)
       @recording.reload
-      
+
       respond_to do |format|
         format.html do
-          redirect_to view_recording_path(@recording.session_id), notice: 'Recording berhasil dihentikan'
+          redirect_to view_recording_path(@recording.session_id), notice: "Recording berhasil dihentikan"
         end
         format.json do
           render json: {
             success: true,
-            message: 'Recording berhasil dihentikan',
+            message: "Recording berhasil dihentikan",
             data: {
               recording_id: @recording.id,
               session_id: @recording.session_id,
@@ -261,7 +261,7 @@ class DashboardController < ApplicationController
     rescue StandardError => e
       respond_to do |format|
         format.html { redirect_to view_recording_path(@recording.session_id), alert: "Gagal menghentikan recording: #{e.message}" }
-        format.json { render json: { success: false, error: 'Gagal menghentikan recording', details: e.message }, status: :internal_server_error }
+        format.json { render json: { success: false, error: "Gagal menghentikan recording", details: e.message }, status: :internal_server_error }
       end
     end
   end
@@ -270,7 +270,7 @@ class DashboardController < ApplicationController
 
   def set_medical_staff
     unless current_user&.medical_staff
-      redirect_to root_path, alert: 'Akses ditolak'
+      redirect_to root_path, alert: "Akses ditolak"
       return
     end
     @medical_staff = current_user.medical_staff
@@ -278,7 +278,7 @@ class DashboardController < ApplicationController
 
   def set_patient
     unless current_user&.patient
-      redirect_to root_path, alert: 'Akses ditolak'
+      redirect_to root_path, alert: "Akses ditolak"
       return
     end
     @patient = current_user.patient

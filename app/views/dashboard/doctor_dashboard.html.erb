@@ -154,6 +154,9 @@
               </div>
             <% end %>
           </div>
+          <div class="mt-8 flex justify-center">
+            <%= paginate @pending_sessions %>
+          </div>
         <% else %>
           <div class="text-center py-12">
             <svg class="mx-auto h-16 w-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
