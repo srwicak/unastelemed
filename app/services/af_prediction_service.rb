@@ -25,8 +25,8 @@ class AfPredictionService
         }
       end
 
-      # Get sample rate
-      sample_rate = recording.sample_rate || 400
+      # Get sample rate and ensure it is an integer
+      sample_rate = (recording.sample_rate || 400).to_i
 
       # Make API request
       response = make_request(samples, sample_rate)
