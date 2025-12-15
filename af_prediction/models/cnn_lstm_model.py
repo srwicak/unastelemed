@@ -39,19 +39,28 @@ class AFPredictor:
     """
     
     def __init__(self, model_path=None):
-        self.model_path = model_path or MODEL_PATH
-        self.model = None
-        self._load_model()
-    
-    def _load_model(self):
-        """Load trained model"""
-        if os.path.exists(self.model_path):
-            self.model = keras.models.load_model(self.model_path)
-            print(f"✓ Model loaded: {self.model_path}")
+        if model_path is None:
+            # Try to load .h5 first (more compatible), then .keras
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            h5_path = os.path.join(base_dir, 'models', 'trained', 'af_cnn_lstm.h5')
+            keras_path = os.path.join(base_dir, 'models', 'trained', 'af_cnn_lstm.keras')
+            
+            if os.path.exists(h5_path):
+                self.model_path = h5_path
+                print(f"[INFO] Loading model from: {self.model_path} (H5 Legacy Format)")
+            else:
+                self.model_path = keras_path
+                print(f"[INFO] Loading model from: {self.model_path}")
         else:
-            print(f"⚠ Model not found: {self.model_path}")
-            print("  Run training/train_model.py first")
-            self.model = None
+            self.model_path = model_path
+
+        try:
+            # Explicitly compile=False to avoid optimizer version conflicts
+            self.model = keras.models.load_model(self.model_path, compile=False)
+            print("[INFO] Model loaded successfully.")
+        except Exception as e:
+            print(f"[ERROR] Failed to load model: {e}")
+            raise e
     
     def preprocess_signal(self, samples, sample_rate=400):
         """
